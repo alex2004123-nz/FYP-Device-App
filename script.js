@@ -11,7 +11,7 @@ function handlePressureData(event) {
     const pressure = value.getFloat64(0, true); 
     
     // 3. Update your HTML text (formatting it to 2 decimal places so it looks clean)
-    document.getElementById('display').innerText = pressure.toFixed(2) + " PSI";
+    document.getElementById('pressure_display').innerText = pressure.toFixed(2) + " PSI";
 }
 
 async function connectBluetooth() {
@@ -29,6 +29,7 @@ async function connectBluetooth() {
   });
 
     console.log(`Connected to: ${device.name}`);
+    document.getElementById('pressure_display').innerText = "Connected, waiting for response."
 
     // 2. Connect to the GATT Server
     const server = await device.gatt.connect();
@@ -39,11 +40,11 @@ async function connectBluetooth() {
 
     // 5. Read the Value
     const value = await pressure_read.readValue();
-    await pressure_read.startNotifications();
+   
     
     // Data arrives as a DataView, extract the unsigned 8-bit integer
     const pressure = value.getUint8(0);
-
+    await pressure_read.startNotifications();
     pressure_read.addEventListener('characteristicvaluechanged', handlePressureData);
 
   } catch (error) {

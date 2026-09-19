@@ -7,8 +7,8 @@ button.addEventListener('click', connectBluetooth);
 
 function handlePressureData(event) {
     const value = event.target.value;
-    const decoder = new TextDecoder('utf-8');
-    const text = decoder.decode(value);
+    
+    const text = value.getFloat64(0, true); 
     
     // Update your HTML
     document.getElementById('display').innerText = text;

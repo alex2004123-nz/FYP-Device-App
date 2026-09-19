@@ -1,8 +1,18 @@
 console.log("JavaScript is successfully connected!");
 
 const button = document.getElementById('bluetoothConnect');
+const SERVICE_UUID =  "12345678-1234-1234-1234-123456789abc";
 
 button.addEventListener('click', connectBluetooth);
+
+function handlePressureData(event) {
+    const value = event.target.value;
+    const decoder = new TextDecoder('utf-8');
+    const text = decoder.decode(value);
+    
+    // Update your HTML
+    document.getElementById('display').innerText = text;
+}
 
 async function connectBluetooth() {
     try {
@@ -23,18 +33,18 @@ async function connectBluetooth() {
     // 2. Connect to the GATT Server
     const server = await device.gatt.connect();
 
-    // 3. Get the Battery Service
-    const service = await server.getPrimaryService('battery_service');
+    const service = await server.getPrimaryService(SERVICE_UUID);
 
-    // 4. Get the Battery Level Characteristic
-    const characteristic = await service.getCharacteristic('battery_level');
+    const pressure_read = await service.getCharacteristic("Pressure");
 
     // 5. Read the Value
-    const value = await characteristic.readValue();
+    const value = await pressure_read.readValue();
+    await pressure_read.startNotifications();
     
     // Data arrives as a DataView, extract the unsigned 8-bit integer
-    const batteryLevel = value.getUint8(0);
-    console.log(`Battery Level is ${batteryLevel}%`);
+    const pressure = value.getUint8(0);
+
+    pressure_read.addEventListener('characteristicvaluechanged', handlePressureData);
 
   } catch (error) {
     console.error('Bluetooth Error:', error);

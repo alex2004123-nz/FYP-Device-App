@@ -2,6 +2,13 @@ console.log("JavaScript is successfully connected!");
 
 const button = document.getElementById('bluetoothConnect');
 const SERVICE_UUID =  "12345678-1234-1234-1234-123456789abc";
+const PRESSURE_CHAR_UUID = "87654321-4321-4321-4321-cba987654321";
+
+let connectedDevice = null;
+let gattServer = null;
+let bluetoothService = null;
+let pressureCharacteristic = null;
+let motorControlCharacteristic = null;
 
 button.addEventListener('click', connectBluetooth);
 
@@ -20,7 +27,7 @@ async function connectBluetooth() {
     document.getElementById('pressure_display').innerText = "Connecting"
     
     // 1. Scan and filter devices
-  const device = await navigator.bluetooth.requestDevice({
+  connectedDevice = await navigator.bluetooth.requestDevice({
       // This forces the browser to show EVERY local BLE device it finds
       acceptAllDevices: true, 
       
@@ -29,24 +36,19 @@ async function connectBluetooth() {
       optionalServices: ['12345678-1234-1234-1234-123456789abc'] // Replace with your ESP32 Service UUID
   });
 
-    console.log(`Connected to: ${device.name}`);
+    console.log(`Connected to: ${connectedDevice.name}`);
 
 
     // 2. Connect to the GATT Server
-    const server = await device.gatt.connect();
+    gattServer = await connectedDevice.gatt.connect();
 
-    const service = await server.getPrimaryService(SERVICE_UUID);
+    bluetoothService = await gattServer.getPrimaryService(SERVICE_UUID);
 
-    const pressure_read = await service.getCharacteristic("Pressure");
-
-    // 5. Read the Value
-    const value = await pressure_read.readValue();
-   
+    pressureCharacteristic = await bluetoothService.getCharacteristic("Pressure");
     
-    // Data arrives as a DataView, extract the unsigned 8-bit integer
-    const pressure = value.getUint8(0);
-    await pressure_read.startNotifications();
-    pressure_read.addEventListener('characteristicvaluechanged', handlePressureData);
+    await pressureCharacteristic.startNotifications();
+    pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
+    document.getElementById('pressure_display').innerText = "Connected"
 
   } catch (error) {
     console.error('Bluetooth Error:', error);

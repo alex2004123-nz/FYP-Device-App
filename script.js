@@ -17,6 +17,7 @@ function handlePressureData(event) {
 async function connectBluetooth() {
     try {
     console.log('Requesting Bluetooth Device...');
+    document.getElementById('pressure_display').innerText = "Connecting"
     
     // 1. Scan and filter devices
   const device = await navigator.bluetooth.requestDevice({
@@ -29,7 +30,7 @@ async function connectBluetooth() {
   });
 
     console.log(`Connected to: ${device.name}`);
-    document.getElementById('pressure_display').innerText = "Connected, waiting for response."
+
 
     // 2. Connect to the GATT Server
     const server = await device.gatt.connect();

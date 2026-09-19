@@ -9,9 +9,14 @@ async function connectBluetooth() {
     console.log('Requesting Bluetooth Device...');
     
     // 1. Scan and filter devices
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ['battery_service'] }] // Can filter by standard string name or 16/128-bit UUIDs
-    });
+  const device = await navigator.bluetooth.requestDevice({
+      // This forces the browser to show EVERY local BLE device it finds
+      acceptAllDevices: true, 
+      
+      // CRITICAL: You MUST list the service UUIDs you plan to talk to later, 
+      // otherwise the browser blocks you from communicating with them after connection.
+      optionalServices: ['12345678-1234-1234-1234-123456789abc'] // Replace with your ESP32 Service UUID
+  });
 
     console.log(`Connected to: ${device.name}`);
 

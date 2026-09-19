@@ -8,10 +8,10 @@ button.addEventListener('click', connectBluetooth);
 function handlePressureData(event) {
     const value = event.target.value;
     
-    const text = value.getFloat64(0, true); 
+    const pressure = value.getFloat64(0, true); 
     
-    // Update your HTML
-    document.getElementById('display').innerText = text;
+    // 3. Update your HTML text (formatting it to 2 decimal places so it looks clean)
+    document.getElementById('display').innerText = pressure.toFixed(2) + " PSI";
 }
 
 async function connectBluetooth() {

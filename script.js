@@ -23,16 +23,16 @@ function handlePressureData(event) {
   try {
     const value = event.target.value;
 
-    if (value.byteLength >= 12) {
-      const buffer = new ArrayBuffer(12);
+    if (value.byteLength >= 8) {
+      const buffer = new ArrayBuffer(8);
       const view = new DataView(buffer);
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 8; i++) {
           view.setUint8(i, value.getUint8(i));
       }
       // Extract the 64-bit float (double) starting at index 0
-      const currentPressure = view.getFloat64(0, true); 
-      const setPressure = view.getFloat32(8, true);
-      
+      const currentPressure = view.getFloat32(0, true); 
+      const setPressure = view.getFloat32(4, true);
+
       // Update HTML text
       document.getElementById('pressureDisplay').innerText = currentPressure.toFixed(2) + " cm H2O";
       document.getElementById('setPressureDisplay').innerText = setPressure.toFixed(2) + " cm H2O";

@@ -33,25 +33,26 @@ async function connectBluetooth() {
         
         // CRITICAL: You MUST list the service UUIDs you plan to talk to later, 
         // otherwise the browser blocks you from communicating with them after connection.
-        optionalServices: ['12345678-1234-1234-1234-123456789abc'] // Replace with your ESP32 Service UUID
+        optionalServices: [SERVICE_UUID] 
     });
 
-    document.getElementById('connect_status').innerText = "Connecting 2"
+    document.getElementById('connect_status').innerText = "Device found"
 
     // 2. Connect to the GATT Server
     gattServer = await connectedDevice.gatt.connect();
-    document.getElementById('connect_status').innerText = "Connecting 3"
+    document.getElementById('connect_status').innerText = "GATT connected"
     bluetoothService = await gattServer.getPrimaryService(SERVICE_UUID);
-
-    pressureCharacteristic = await bluetoothService.getCharacteristic("Pressure");
-
+    document.getElementById('connect_status').innerText = "Service found"
+    pressureCharacteristic = await bluetoothService.getCharacteristic(PRESSURE_CHAR_UUID);
+    document.getElementById('connect_status').innerText = "Chararacteristic found"
     
     
     await pressureCharacteristic.startNotifications();
     pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
-    document.getElementById('connect_status').innerText = `Connected to: ${connectedDevice.name}`;
+    document.getElementById('connect_status').innerText = `Connected to: ${connectedDevice.name}, receiving data`;
 
   } catch (error) {
     console.error('Bluetooth Error:', error);
+    document.getElementById('connect_status').innerText = `Error: ${error.message}`;
   }
 }

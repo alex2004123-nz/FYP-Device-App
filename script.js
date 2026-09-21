@@ -24,7 +24,7 @@ function handlePressureData(event) {
 async function connectBluetooth() {
     try {
     console.log('Requesting Bluetooth Device...');
-    document.getElementById('pressure_display').innerText = "Connecting"
+    document.getElementById('connect_status').innerText = "Connecting"
     
     // 1. Scan and filter devices
   connectedDevice = await navigator.bluetooth.requestDevice({
@@ -38,7 +38,6 @@ async function connectBluetooth() {
 
     console.log(`Connected to: ${connectedDevice.name}`);
 
-
     // 2. Connect to the GATT Server
     gattServer = await connectedDevice.gatt.connect();
 
@@ -48,7 +47,7 @@ async function connectBluetooth() {
     
     await pressureCharacteristic.startNotifications();
     pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
-    document.getElementById('pressure_display').innerText = "Connected"
+    document.getElementById('connect_status').innerText = `Connected to: ${connectedDevice.name}`;
 
   } catch (error) {
     console.error('Bluetooth Error:', error);

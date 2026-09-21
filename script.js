@@ -37,16 +37,15 @@ async function connectBluetooth() {
     });
 
     document.getElementById('connect_status').innerText = "Connecting 2"
-    console.log(`Connected to: ${connectedDevice.name}`);
 
     // 2. Connect to the GATT Server
     gattServer = await connectedDevice.gatt.connect();
-
+    document.getElementById('connect_status').innerText = "Connecting 3"
     bluetoothService = await gattServer.getPrimaryService(SERVICE_UUID);
 
     pressureCharacteristic = await bluetoothService.getCharacteristic("Pressure");
 
-    document.getElementById('connect_status').innerText = "Connecting 3"
+    
     
     await pressureCharacteristic.startNotifications();
     pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);

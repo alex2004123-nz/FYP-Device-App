@@ -26,16 +26,17 @@ async function connectBluetooth() {
     console.log('Requesting Bluetooth Device...');
     document.getElementById('connect_status').innerText = "Connecting"
     
-    // 1. Scan and filter devices
-  connectedDevice = await navigator.bluetooth.requestDevice({
-      // This forces the browser to show EVERY local BLE device it finds
-      acceptAllDevices: true, 
-      
-      // CRITICAL: You MUST list the service UUIDs you plan to talk to later, 
-      // otherwise the browser blocks you from communicating with them after connection.
-      optionalServices: ['12345678-1234-1234-1234-123456789abc'] // Replace with your ESP32 Service UUID
-  });
+      // 1. Scan and filter devices
+    connectedDevice = await navigator.bluetooth.requestDevice({
+        // This forces the browser to show EVERY local BLE device it finds
+        acceptAllDevices: true, 
+        
+        // CRITICAL: You MUST list the service UUIDs you plan to talk to later, 
+        // otherwise the browser blocks you from communicating with them after connection.
+        optionalServices: ['12345678-1234-1234-1234-123456789abc'] // Replace with your ESP32 Service UUID
+    });
 
+    document.getElementById('connect_status').innerText = "Connecting 2"
     console.log(`Connected to: ${connectedDevice.name}`);
 
     // 2. Connect to the GATT Server
@@ -44,6 +45,8 @@ async function connectBluetooth() {
     bluetoothService = await gattServer.getPrimaryService(SERVICE_UUID);
 
     pressureCharacteristic = await bluetoothService.getCharacteristic("Pressure");
+
+    document.getElementById('connect_status').innerText = "Connecting 3"
     
     await pressureCharacteristic.startNotifications();
     pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);

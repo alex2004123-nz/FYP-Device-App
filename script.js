@@ -6,13 +6,13 @@ const decreaseButton = document.getElementById('decrease');
 
 const SERVICE_UUID =  "12345678-1234-1234-1234-123456789abc";
 const PRESSURE_CHAR_UUID = "87654321-4321-4321-4321-cba987654321";
-const WRITE_CHARACTERISTIC_UUID = '87654321-4321-4321-4321-cba987655676'; 
+const WRITE_CHARACTERISTIC_UUID = "87654321-4321-4321-4321-cba987655676"; 
 
 let connectedDevice = null;
 let gattServer = null;
 let bluetoothService = null;
 let pressureCharacteristic = null;
-let writeCharacteristic;
+let writeCharacteristic = null;;
 let motorControlCharacteristic = null;
 
 button.addEventListener('click', connectBluetooth);
@@ -45,6 +45,7 @@ function handlePressureData(event) {
 }
 
 async function sendCommand(action) {
+  console.log("click")
     if (!writeCharacteristic) return;
     
     try {
@@ -67,11 +68,7 @@ async function connectBluetooth() {
     
       // 1. Scan and filter devices
     connectedDevice = await navigator.bluetooth.requestDevice({
-        // This forces the browser to show EVERY local BLE device it finds
         acceptAllDevices: true, 
-        
-        // CRITICAL: You MUST list the service UUIDs you plan to talk to later, 
-        // otherwise the browser blocks you from communicating with them after connection.
         optionalServices: [SERVICE_UUID] 
     });
 

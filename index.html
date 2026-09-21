@@ -2,21 +2,26 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>My Website</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAP Pressure Control</title>
     <script src="script.js" defer></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <h1>PAP Device Control</h1>
-<button id="bluetoothConnect">Connect Bluetooth</button>
-<p id="connect_status"> Not connected yet... </p>
-<h2>Pressure</h2>
-<p id="pressureDisplay"> Not connected yet... </p>
-<p id="setPressureDisplay">Not connected yet...</p>
-<button id="increase">Increase</button>
-<button id="decrease">Decrease</button>
 
+<div class="layout">
+  <div><p class="connect_stat" id="connect_status"> Not connected yet... </p></div>
+  <div><button class="bt_button" id="bluetoothConnect">Connect Bluetooth</button></div>
+  <div><h2>Pressure</h2></div>
+  <div><p id="pressureDisplay"> Not connected yet... </p></div>
+  <div class="bt_wrapper"><button class="center-btn" id="increase">+</button></div>
+  <div><p id="setPressureDisplay">Not connected yet...</p></div>
+  <div class="bt_wrapper"><button class="center-btn" id="decrease">-</button></div>
+</div>
+
+ 
 
 </body>
 </html>

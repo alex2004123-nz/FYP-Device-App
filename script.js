@@ -16,8 +16,8 @@ let writeCharacteristic = null;;
 let motorControlCharacteristic = null;
 
 button.addEventListener('click', connectBluetooth);
-increaseButton.addEventListener('click', sendCommand('increase'));
-decreaseButton.addEventListener('click', sendCommand('decrease'));
+increaseButton.addEventListener('click', () => sendCommand('increase'));
+decreaseButton.addEventListener('click', () => sendCommand('decrease'));
 
 function handlePressureData(event) {
   try {

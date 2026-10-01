@@ -60,7 +60,8 @@ async function sendCommand(target, action) {
     if (!writeCharacteristic) return;
     
     try {
-        await writeChar.writeValue(new Uint8Array([target, action]));
+      const data = new Uint8Array([target, action]);
+        await writeChar.writeValue(data);
         console.log(`Sent command: target=${target}, action=${action}`);
     } catch (error) {
         console.error("Failed to send command:", error);

@@ -1,12 +1,21 @@
 console.log("JavaScript is successfully connected!");
 
 const button = document.getElementById('bluetoothConnect');
-const increaseButton = document.getElementById('increase');
-const decreaseButton = document.getElementById('decrease');
+const increaseExpirButton = document.getElementById('increase');
+const decreaseExpirButton = document.getElementById('decrease');
+
+const increaseInspirButton = document.getElementById('increaseInspir');
+const decreaseInspirButton = document.getElementById('decreaseInspir');
+
+const CPAPButton = document.getElementById('CPAP');
+const BiPAPButton = document.getElementById('BiPAP');
+const APAPButton = document.getElementById('APAP');
 
 const SERVICE_UUID =  "12345678-1234-1234-1234-123456789abc";
 const PRESSURE_CHAR_UUID = "87654321-4321-4321-4321-cba987654321";
 const WRITE_CHARACTERISTIC_UUID = "87654321-4321-4321-4321-cba987655676"; 
+
+let papState = 0;
 
 let connectedDevice = null;
 let gattServer = null;
@@ -16,49 +25,62 @@ let writeCharacteristic = null;;
 let motorControlCharacteristic = null;
 
 button.addEventListener('click', connectBluetooth);
-increaseButton.addEventListener('click', () => sendCommand('increase'));
-decreaseButton.addEventListener('click', () => sendCommand('decrease'));
+increaseExpirButton.addEventListener('click', () => sendCommand(0, 1));
+decreaseExpirButton.addEventListener('click', () => sendCommand(0, 0));
+increaseInspirButton.addEventListener('click', () => sendCommand(1, 1));
+decreaseInspirButton.addEventListener('click', () => sendCommand(1, 0));
+CPAPButton.addEventListener('click', () => changePAPState(0));
+BiPAPButton.addEventListener('click', () => changePAPState(1));
+APAPButton.addEventListener('click', () => changePAPState(2));
 
 function handlePressureData(event) {
   try {
-    const value = event.target.value;
+    const view = event.target.value; 
 
-    if (value.byteLength >= 8) {
-      const buffer = new ArrayBuffer(8);
-      const view = new DataView(buffer);
-      for (let i = 0; i < 8; i++) {
-          view.setUint8(i, value.getUint8(i));
-      }
-      // Extract the 64-bit float (double) starting at index 0
-      const currentPressure = view.getFloat32(0, true); 
-      const setPressure = view.getFloat32(4, true);
+    if (view.byteLength >= 13) {
+      const currentPressure = view.getFloat32(0, true);
+      const setExpir        = view.getFloat32(4, true);
+      const setInspir       = view.getFloat32(8, true);
+      papState = view.getUint8(12)
 
-      // Update HTML text
-      document.getElementById('pressureDisplay').innerText = currentPressure.toFixed(2) + " cm H2O";
-      document.getElementById('setPressureDisplay').innerText = setPressure.toFixed(2) + " cm H2O";
+      document.getElementById('pressureDisplay').innerText =
+        currentPressure.toFixed(2) + " cm H2O";
+      document.getElementById('setPressureDisplay').innerText =
+        setExpir.toFixed(2) + " cm H2O";
+      document.getElementById('setInspirDisplay').innerText =
+        setInspir.toFixed(2) + " cm H2O";
+      updatePapButtons(papState);
     } else {
-      document.getElementById('pressureDisplay').innerText = "Invalid size";
+      document.getElementById('pressureDisplay').innerText =
+        `Invalid size (${view.byteLength} bytes, expected 13)`;
     }
-  } catch(error) {
+  } catch (error) {
     document.getElementById('pressureDisplay').innerText = `Error: ${error.message}`;
   }
 }
 
-async function sendCommand(action) {
+async function sendCommand(target, action) { 
   console.log("click")
     if (!writeCharacteristic) return;
     
     try {
-        // send 1 for increase, 0 for decrease
-        const value = (action === 'increase') ? 1 : 0;
-       
-        const data = new Uint8Array([value]);
-        
-        await writeCharacteristic.writeValue(data);
+        await writeChar.writeValue(new Uint8Array([target, action]));
         console.log(`Sent command: ${action} (${value})`);
     } catch (error) {
         console.error("Failed to send command:", error);
     }
+}
+
+async function changePAPState(toWhat) {
+  if (papState == (toWhat - 1)) {
+    sendCommand(2, 1);
+  } else if (papState == (toWhat + 1)) {
+    sendCommand(2, 0);
+  } else if ((papState == 0) && (toWhat == 2)) {
+    sendCommand(2, 0);
+  } else if ((papState == 2) && (toWhat == 0)) {
+    sendCommand(2, 1);
+  }
 }
 
 async function connectBluetooth() {
@@ -92,4 +114,10 @@ async function connectBluetooth() {
     console.error('Bluetooth Error:', error);
     document.getElementById('connect_status').innerText = `Error: ${error.message}`;
   }
+}
+
+function updatePapButtons(papState) {
+  document.querySelectorAll('.pap-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.pap) === papState);
+  });
 }

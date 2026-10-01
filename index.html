@@ -13,15 +13,46 @@
 
 <div class="layout">
   <div><p class="connect_stat" id="connect_status"> Not connected yet... </p></div>
-  <div><button class="bt_button" id="bluetoothConnect">Connect Bluetooth</button></div>
-  <div><h2>Pressure</h2></div>
-  <div><p id="pressureDisplay"> Not connected yet... </p></div>
-  <div class="bt_wrapper"><button class="center-btn" id="increase">+</button></div>
-  <div><p id="setPressureDisplay">Not connected yet...</p></div>
-  <div class="bt_wrapper"><button class="center-btn" id="decrease">-</button></div>
-</div>
+  <div class="bt_wrapper"><button class="bt_button" id="bluetoothConnect">Connect Bluetooth</button></div>
 
- 
+  <!-- Mode (phone -> ESP32) -->
+  <div class="card">
+    <h2>Mode</h2>
+    <div class="mode_row">
+      <button class="mode_btn" data-mode="STANDBY">Standby</button>
+      <button class="mode_btn" data-mode="CPAP">CPAP</button>
+      <button class="mode_btn" data-mode="BIPAP">BiPAP</button>
+    </div>
+  </div>
+
+  <!-- Live readings (PEEP -> ESP32 -> phone) -->
+  <div class="card">
+    <h2>Pressure</h2>
+    <p id="pressureDisplay"> Not connected yet... </p>
+    <p class="small">Target: <span id="setPressureDisplay">--</span></p>
+    <p class="small">Flow: <span id="flowDisplay">--</span></p>
+    <p class="small">Phase: <span id="phaseDisplay">--</span> &middot; Valve link: <span id="linkDisplay">--</span></p>
+  </div>
+
+  <!-- Set pressures (phone -> ESP32) -->
+  <div class="card">
+    <h2>Inspiratory (IPAP)</h2>
+    <div class="adjust_row">
+      <button class="round_btn" id="ipapDown">-</button>
+      <span class="set_value" id="ipapDisplay">--</span>
+      <button class="round_btn" id="ipapUp">+</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Expiratory (EPAP / CPAP)</h2>
+    <div class="adjust_row">
+      <button class="round_btn" id="epapDown">-</button>
+      <span class="set_value" id="epapDisplay">--</span>
+      <button class="round_btn" id="epapUp">+</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

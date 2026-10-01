@@ -6,11 +6,9 @@ body {
 }
 
 .layout {
-
-  /* justify-content: center; Centers horizontally */
-  align-items: center;     /* Centers vertically */
+  max-width: 420px;
+  margin: 0 auto;
   text-align: center;
-    
 }
 
 h1 {
@@ -18,40 +16,41 @@ h1 {
   font-size: 1.5rem;
 }
 
-.layout h2 {
-  margin: 0.5rem 0 0;
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
 }
 
-#connect_status,
-#pressureDisplay {
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+#connect_status {
   color: #555;
   font-size: 1rem;
 }
 
-#setPressureDisplay {
-  font-size: 3rem;
+#pressureDisplay {
+  font-size: 2.5rem;
   font-weight: 700;
   color: #1a1a1a;
   margin: 0.25rem 0;
 }
 
-button {
-  width: 64px;
-  height: 64px;
-  border: none;
-  border-radius: 50%;
-  background: #2563eb;
-  color: white;
-  font-size: 2rem;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  touch-action: manipulation;
+.small {
+  color: #555;
+  margin: 0.2rem 0;
 }
 
-.bt_button {
-    margin-right: 20px;
+button {
+  border: none;
+  background: #2563eb;
+  color: white;
+  touch-action: manipulation;
 }
 
 button:active {
@@ -59,20 +58,53 @@ button:active {
   transform: scale(0.95);
 }
 
+.bt_wrapper {
+  text-align: center;
+}
+
 #bluetoothConnect {
-  width: auto;
-  height: auto;
   border-radius: 8px;
   padding: 0.6rem 1.2rem;
   font-size: 1rem;
 }
 
-.bt_wrapper {
-    text-align: center;
+.mode_row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
-.center-btn {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
+.mode_btn {
+  flex: 1;
+  padding: 0.6rem 0;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #cbd5e1;
+  color: #1a1a1a;
+}
+
+.mode_btn.active {
+  background: #2563eb;
+  color: white;
+}
+
+.adjust_row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.round_btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.set_value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  min-width: 4ch;
 }

@@ -13,7 +13,7 @@ const APAPButton = document.getElementById('APAP');
 
 const SERVICE_UUID =  "12345678-1234-1234-1234-123456789abc";
 const PRESSURE_CHAR_UUID = "87654321-4321-4321-4321-cba987654321";
-const WRITE_CHARACTERISTIC_UUID = "87654321-4321-4321-4321-cba987655676"; 
+const WRITE_CHARACTERISTIC_UUID = "87654321-4321-4321-4321-cba987655676";  
 
 let papState = 0;
 
@@ -60,7 +60,7 @@ async function sendCommand(target, action) {
     if (!writeCharacteristic) return;
     
     try {
-      const data = new Uint8Array([target, action]);
+      const data = new Uint8Array([target]);
         await writeCharacteristic.writeValue(data);
         console.log(`Sent command: target=${target}, action=${action}`);
     } catch (error) {

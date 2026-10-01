@@ -25,7 +25,7 @@ let writeCharacteristic = null;;
 let motorControlCharacteristic = null;
 
 button.addEventListener('click', connectBluetooth);
-increaseExpirButton.addEventListener('click', () => sendCommand(0, 1));
+increaseExpirButton.addEventListener('click', () => sendCommandOld('increase'));
 decreaseExpirButton.addEventListener('click', () => sendCommand(0, 0));
 increaseInspirButton.addEventListener('click', () => sendCommand(1, 1));
 decreaseInspirButton.addEventListener('click', () => sendCommand(1, 0));
@@ -63,6 +63,23 @@ async function sendCommand(target, action) {
       const data = new Uint8Array([target]);
         await writeCharacteristic.writeValue(data);
         console.log(`Sent command: target=${target}, action=${action}`);
+    } catch (error) {
+        console.error("Failed to send command:", error);
+    }
+}
+
+async function sendCommandOld(action) {
+  console.log("click")
+    if (!writeCharacteristic) return;
+    
+    try {
+        // send 1 for increase, 0 for decrease
+        const value = (action === 'increase') ? 1 : 0;
+       
+        const data = new Uint8Array([value]);
+        
+        await writeCharacteristic.writeValue(data);
+        console.log(`Sent command: ${action} (${value})`);
     } catch (error) {
         console.error("Failed to send command:", error);
     }

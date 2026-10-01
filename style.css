@@ -78,7 +78,8 @@ button:active {
 }
 
 .pap-btn {
-  background: #9e9e9e;   /* grey = inactive */
+  flex: 1;          
+  background: #9e9e9e;   
   color: white;
   border: none;
   padding: 12px 20px;
@@ -87,4 +88,15 @@ button:active {
 }
 .pap-btn.active {
   background: #1976d2;   /* blue = active */
+}
+
+.pap-row {
+  display: flex;
+  gap: 10px;          /* space between buttons */
+  width: 100%;
+}
+
+.connect-row {
+  display: flex;
+  justify-content: center;
 }

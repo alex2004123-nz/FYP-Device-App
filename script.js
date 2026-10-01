@@ -43,16 +43,12 @@ function handlePressureData(event) {
       const setInspir       = view.getFloat32(8, true);
       papState = view.getUint8(12)
 
-      document.getElementById('pressureDisplay').innerText =
-        currentPressure.toFixed(2) + " cm H2O";
-      document.getElementById('setPressureDisplay').innerText =
-        setExpir.toFixed(2) + " cm H2O";
-      document.getElementById('setInspirDisplay').innerText =
-        setInspir.toFixed(2) + " cm H2O";
+      document.getElementById('pressureDisplay').innerText = currentPressure.toFixed(2) + " cm H2O";
+      document.getElementById('setPressureDisplay').innerText = setExpir.toFixed(2) + " cm H2O";
+      document.getElementById('setInspirPressureDisplay').innerText = setInspir.toFixed(2) + " cm H2O";
       updatePapButtons(papState);
     } else {
-      document.getElementById('pressureDisplay').innerText =
-        `Invalid size (${view.byteLength} bytes, expected 13)`;
+      document.getElementById('pressureDisplay').innerText = `Invalid size (${view.byteLength} bytes, expected 13)`;
     }
   } catch (error) {
     document.getElementById('pressureDisplay').innerText = `Error: ${error.message}`;

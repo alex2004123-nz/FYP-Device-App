@@ -1,11 +1,11 @@
 console.log("JavaScript is successfully connected!");
 
 const button = document.getElementById('bluetoothConnect');
-const increaseExpirButton = document.getElementById('increase');
-const decreaseExpirButton = document.getElementById('decrease');
+const increaseExpirButton = document.getElementById('increaseExpirButton');
+const decreaseExpirButton = document.getElementById('decreaseExpirButton');
 
-const increaseInspirButton = document.getElementById('increaseInspir');
-const decreaseInspirButton = document.getElementById('decreaseInspir');
+const increaseInspirButton = document.getElementById('increaseInspirButton');
+const decreaseInspirButton = document.getElementById('decreaseInspirButton');
 
 const CPAPButton = document.getElementById('CPAP');
 const BiPAPButton = document.getElementById('BiPAP');
@@ -61,7 +61,7 @@ async function sendCommand(target, action) {
     
     try {
       const data = new Uint8Array([target, action]);
-        await writeChar.writeValue(data);
+        await writeCharacteristic.writeValue(data);
         console.log(`Sent command: target=${target}, action=${action}`);
     } catch (error) {
         console.error("Failed to send command:", error);

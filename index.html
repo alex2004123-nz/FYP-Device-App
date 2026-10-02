@@ -1,58 +1,134 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PAP Pressure Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f4f0e8">
+    <title>PAP Device</title>
+    <script>
+      // Apply the saved theme (light by default) before first paint to avoid a flash
+      (() => {
+        let theme = null;
+        try { theme = localStorage.getItem('theme'); } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') theme = 'light';
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="script.js" defer></script>
+    <script src="ui.js" defer></script>
+    <script src="theme.js" defer></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>PAP Device Control</h1>
+<div class="grain" aria-hidden="true"></div>
 
-<div class="layout">
-  <div><p class="connect_stat" id="connect_status"> Not connected yet... </p></div>
-  <div class="bt_wrapper"><button class="bt_button" id="bluetoothConnect">Connect Bluetooth</button></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand_mark" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/>
+      <path d="M3 16h6l3-7 4 14 3-9 2 2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>PAP Device</h1>
+  </div>
+  <div class="topbar_end">
+    <button class="theme_toggle" id="themeToggle" role="switch" aria-checked="true" aria-label="Light mode">
+      <span class="switch_label">Light</span>
+      <span class="switch_track" aria-hidden="true">
+        <span class="switch_thumb">
+          <svg class="moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
+          <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+      </span>
+    </button>
+    <span class="live_dot" aria-hidden="true"></span>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="connect_panel">
+    <div class="status_line">
+      <span class="status_led" aria-hidden="true"></span>
+      <p class="connect_stat" id="connect_status"> Not connected yet... </p>
+    </div>
+    <div class="bt_wrapper">
+      <button class="bt_button" id="bluetoothConnect">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="btLabel">Connect Bluetooth</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Live readings (PEEP -> ESP32 -> phone) -->
+  <section class="card hero" style="--i:1">
+    <div class="hero_head">
+      <h2>Pressure</h2>
+      <span class="phase_chip"><span id="phaseDisplay">--</span></span>
+    </div>
+
+    <div class="gauge">
+      <div class="breath" aria-hidden="true">
+        <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+      </div>
+      <p id="pressureDisplay"> Not connected yet... </p>
+    </div>
+
+    <dl class="stats">
+      <div class="stat">
+        <dt>Target</dt>
+        <dd class="small"><span id="setPressureDisplay">--</span></dd>
+      </div>
+      <div class="stat">
+        <dt>Flow</dt>
+        <dd class="small"><span id="flowDisplay">--</span></dd>
+      </div>
+      <div class="stat">
+        <dt>Valve link</dt>
+        <dd class="small"><span id="linkDisplay">--</span></dd>
+      </div>
+    </dl>
+  </section>
 
   <!-- Mode (phone -> ESP32) -->
-  <div class="card">
+  <section class="card" style="--i:2">
     <h2>Mode</h2>
     <div class="mode_row">
       <button class="mode_btn" data-mode="STANDBY">Standby</button>
       <button class="mode_btn" data-mode="CPAP">CPAP</button>
       <button class="mode_btn" data-mode="BIPAP">BiPAP</button>
     </div>
-  </div>
-
-  <!-- Live readings (PEEP -> ESP32 -> phone) -->
-  <div class="card">
-    <h2>Pressure</h2>
-    <p id="pressureDisplay"> Not connected yet... </p>
-    <p class="small">Target: <span id="setPressureDisplay">--</span></p>
-    <p class="small">Flow: <span id="flowDisplay">--</span></p>
-    <p class="small">Phase: <span id="phaseDisplay">--</span> &middot; Valve link: <span id="linkDisplay">--</span></p>
-  </div>
+  </section>
 
   <!-- Set pressures (phone -> ESP32) -->
-  <div class="card">
-    <h2>Inspiratory (IPAP)</h2>
-    <div class="adjust_row">
-      <button class="round_btn" id="ipapDown">-</button>
-      <span class="set_value" id="ipapDisplay">--</span>
-      <button class="round_btn" id="ipapUp">+</button>
-    </div>
-  </div>
+  <div class="setpoints">
+    <section class="card setpoint insp" id="ipapCard" style="--i:3">
+      <h2>Inspiratory (IPAP)</h2>
+      <div class="adjust_row">
+        <button class="round_btn" id="ipapDown" aria-label="Decrease IPAP">&minus;</button>
+        <div class="value_wrap">
+          <span class="set_value" id="ipapDisplay">--</span>
+          <span class="unit">cm H₂O</span>
+        </div>
+        <button class="round_btn" id="ipapUp" aria-label="Increase IPAP">+</button>
+      </div>
+    </section>
 
-  <div class="card">
-    <h2>Expiratory (EPAP / CPAP)</h2>
-    <div class="adjust_row">
-      <button class="round_btn" id="epapDown">-</button>
-      <span class="set_value" id="epapDisplay">--</span>
-      <button class="round_btn" id="epapUp">+</button>
-    </div>
+    <section class="card setpoint exp" id="epapCard" style="--i:4">
+      <h2 id="epapTitle">Expiratory (EPAP)</h2>
+      <div class="adjust_row">
+        <button class="round_btn" id="epapDown" aria-label="Decrease EPAP">&minus;</button>
+        <div class="value_wrap">
+          <span class="set_value" id="epapDisplay">--</span>
+          <span class="unit">cm H₂O</span>
+        </div>
+        <button class="round_btn" id="epapUp" aria-label="Increase EPAP">+</button>
+      </div>
+    </section>
   </div>
-</div>
+</main>
 
 </body>
 </html>

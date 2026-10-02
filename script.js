@@ -29,55 +29,13 @@ let device = { ipap: null, epap: null, mode: null };
 
 const $ = (id) => document.getElementById(id);
 
-$('bluetoothConnect').addEventListener('click', onConnectButton);
-
-// Connect when disconnected, disconnect when connected
-function onConnectButton() {
-  if (connectedDevice && connectedDevice.gatt.connected) {
-    connectedDevice.gatt.disconnect(); // fires 'gattserverdisconnected' -> onDisconnected()
-  } else {
-    connectBluetooth();
-  }
-}
-
-// Button text/state: 'idle' | 'busy' | 'connected'
-function setButton(state) {
-  const btn = $('bluetoothConnect');
-  btn.disabled = state === 'busy';
-  $('btLabel').innerText =
-    state === 'connected' ? 'Disconnect' :
-    state === 'busy' ? 'Connecting…' : 'Connect Bluetooth';
-}
-
-// Short, readable versions of the common Web Bluetooth errors
-function friendlyError(error) {
-  if (!navigator.bluetooth) return 'this browser has no Bluetooth';
-  switch (error && error.name) {
-    case 'NotFoundError':    return 'no device chosen';
-    case 'NetworkError':     return 'connection lost';
-    case 'SecurityError':    return 'Bluetooth blocked (needs https)';
-    case 'NotSupportedError':return 'not supported here';
-    default:                 return (error && error.message) || 'unknown';
-  }
-}
-
-// Status text: short so it fits on a phone; the full text is in the tooltip
-function setStatus(text) {
-  const el = $('connect_status');
-  el.innerText = text;
-  el.title = text;
-}
+$('bluetoothConnect').addEventListener('click', connectBluetooth);
 $('ipapUp').addEventListener('click', () => adjust('IPAP', +STEP_CM_H2O));
 $('ipapDown').addEventListener('click', () => adjust('IPAP', -STEP_CM_H2O));
 $('epapUp').addEventListener('click', () => adjust('EPAP', +STEP_CM_H2O));
 $('epapDown').addEventListener('click', () => adjust('EPAP', -STEP_CM_H2O));
 document.querySelectorAll('.mode_btn').forEach((btn) =>
-  btn.addEventListener('click', () => {
-    // Update the screen straight away; the next telemetry confirms it
-    device.mode = MODE_NAMES.indexOf(btn.dataset.mode);
-    render();
-    sendText(`MODE=${btn.dataset.mode}`);
-  })
+  btn.addEventListener('click', () => sendText(`MODE=${btn.dataset.mode}`))
 );
 
 // ------------------------------------------------------------
@@ -115,12 +73,8 @@ function handlePressureData(event) {
     }
     const pressure = v.getFloat32(0, true);
     const setpoint = v.getFloat32(4, true);
-    // Number and unit are separate so the unit can be smaller and the reading fits on phones
-    const unit = document.createElement('span');
-    unit.className = 'p_unit';
-    unit.textContent = 'cm H₂O';
-    $('pressureDisplay').replaceChildren(pressure.toFixed(2), unit);
-    $('setPressureDisplay').innerText = setpoint.toFixed(2) + " cm H₂O";
+    $('pressureDisplay').innerText = pressure.toFixed(2) + " cm H2O";
+    $('setPressureDisplay').innerText = setpoint.toFixed(2) + " cm H2O";
 
     if (v.byteLength >= 18) {
       const flow = v.getFloat32(8, true);
@@ -145,15 +99,6 @@ function render() {
   document.querySelectorAll('.mode_btn').forEach((btn) =>
     btn.classList.toggle('active', MODE_NAMES[device.mode] === btn.dataset.mode)
   );
-
-  // CPAP uses a single pressure (sent as EPAP); BiPAP shows IPAP and EPAP separately;
-  // Standby shows no pressure controls
-  const mode = MODE_NAMES[device.mode];
-  const isCpap = mode === 'CPAP';
-  const isStandby = mode === 'STANDBY';
-  $('ipapCard').style.display = (isCpap || isStandby) ? 'none' : '';
-  $('epapCard').style.display = isStandby ? 'none' : '';
-  $('epapTitle').innerText = isCpap ? 'CPAP' : 'Expiratory (EPAP)';
 }
 
 // ------------------------------------------------------------
@@ -161,8 +106,7 @@ function render() {
 // ------------------------------------------------------------
 async function connectBluetooth() {
   try {
-    setButton('busy');
-    setStatus("Connecting");
+    $('connect_status').innerText = "Connecting";
 
     connectedDevice = await navigator.bluetooth.requestDevice({
       // Only list the PAP device (matched by its service, or by name as a fallback)
@@ -170,26 +114,24 @@ async function connectBluetooth() {
       optionalServices: [SERVICE_UUID],
     });
     connectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
-    setStatus("Device found");
+    $('connect_status').innerText = "Device found";
 
     const gattServer = await connectedDevice.gatt.connect();
-    setStatus("GATT connected");
+    $('connect_status').innerText = "GATT connected";
 
     const service = await gattServer.getPrimaryService(SERVICE_UUID);
-    setStatus("Service found");
+    $('connect_status').innerText = "Service found";
 
     pressureCharacteristic = await service.getCharacteristic(PRESSURE_CHAR_UUID);
     writeCharacteristic = await service.getCharacteristic(WRITE_CHARACTERISTIC_UUID);
-    setStatus("Characteristics found");
+    $('connect_status').innerText = "Characteristics found";
 
     await pressureCharacteristic.startNotifications();
     pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
-    setStatus(`Connected to ${connectedDevice.name || 'device'}`);
-    setButton('connected');
+    $('connect_status').innerText = `Connected to: ${connectedDevice.name}, receiving data`;
   } catch (error) {
     console.error('Bluetooth Error:', error);
-    setStatus(`Error: ${friendlyError(error)}`);
-    setButton(connectedDevice && connectedDevice.gatt.connected ? 'connected' : 'idle');
+    $('connect_status').innerText = `Error: ${error.message}`;
   }
 }
 
@@ -197,7 +139,6 @@ function onDisconnected() {
   writeCharacteristic = null;
   pressureCharacteristic = null;
   device = { ipap: null, epap: null, mode: null };
-  setStatus("Disconnected");
-  setButton('idle');
+  $('connect_status').innerText = "Disconnected - tap Connect Bluetooth";
   $('linkDisplay').innerText = "--";
 }

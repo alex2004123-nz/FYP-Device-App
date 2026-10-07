@@ -194,6 +194,8 @@ function handlePressureData(event) {
     unit.textContent = 'cm H₂O';
     $('pressureDisplay').replaceChildren(pressure.toFixed(2), unit);
     $('setPressureDisplay').innerText = setpoint.toFixed(2) + " cm H₂O";
+    // Phase is only known from 18-byte packets
+    Trend.add(pressure, setpoint, v.byteLength >= 18 ? (v.getUint8(17) & 0x01) !== 0 : null);
 
     if (v.byteLength >= 18) {
       const flow = v.getFloat32(8, true);
@@ -280,6 +282,7 @@ async function connectBluetooth() {
     connectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
     setStatus("Device found");
 
+    Trend.clear(); // fresh graph for a new connection (reconnects keep the history)
     await openGatt();
     markConnected();
   } catch (error) {
@@ -311,11 +314,13 @@ function markConnected() {
   setStatus(`Connected to ${connectedDevice.name || 'device'}`);
   setButton('connected');
   keepScreenOn(true);
+  Trend.setLive(true);
 }
 
 function onDisconnected() {
   const wasLive = live;
   live = false;
+  Trend.setLive(false);
   writeCharacteristic = null;
   pressureCharacteristic = null;
   device = { ipap: null, epap: null, mode: 0 };

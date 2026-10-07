@@ -608,6 +608,35 @@ body:not(.is-connected) .r1 { animation: idle 5s ease-in-out infinite; }
   .ring { --size: clamp(150px, 26dvh, 190px); }
 }
 
+/* Short screens (e.g. iPhone 13 in Safari/Bluefy, or as a home-screen app with the notch):
+   trim spacing and let the gauge/graph shrink so the IPAP/EPAP buttons fit without scrolling */
+@media (max-height: 820px) {
+  body {
+    padding-top: max(.6rem, env(safe-area-inset-top));
+    padding-bottom: calc(.6rem + env(safe-area-inset-bottom));
+  }
+  .topbar { margin: 0 auto .7rem; }
+  .layout { gap: .6rem; }
+  .card { padding: .85rem 1rem .9rem; }
+  h2 { margin-bottom: .6rem; }
+
+  /* Gauge/graph get whatever height is left after the rest of the page (~490px) */
+  .gauge { min-height: clamp(130px, 100dvh - 495px, 240px); margin: .2rem 0 .6rem; }
+  .ring { --size: clamp(124px, 100dvh - 515px, 190px); }
+  .graph_view { margin: .2rem 0 .6rem; }
+  .trend_plot { height: clamp(120px, 100dvh - 515px, 210px); }
+  .stats { padding-top: .7rem; }
+
+  .mode_btn { padding: .5rem .25rem; }
+  .set_value { font-size: 2.3rem; }
+  .unit { margin-top: .25rem; }
+  .round_btn { width: 44px; height: 44px; }
+  @container (max-width: 250px) {
+    .value_wrap { margin-bottom: .2rem; }
+    .round_btn { width: 100%; height: 36px; }
+  }
+}
+
 @media (max-width: 360px) {
   .is-connected #pressureDisplay { font-size: 2.6rem; }
   .mode_btn { font-size: .82rem; }

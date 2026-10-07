@@ -62,15 +62,9 @@
   </section>
 
   <!-- Live readings (PEEP -> ESP32 -> phone) -->
-  <section class="card hero" id="valveCard" style="--i:1">
+  <section class="card hero" style="--i:1">
     <div class="hero_head">
-      <div class="hero_title">
-        <h2>Valve</h2>
-        <div class="view_toggle" role="group" aria-label="Pressure view">
-          <button class="view_btn" data-view="ring" aria-pressed="true">Ring</button>
-          <button class="view_btn" data-view="graph" aria-pressed="false">Graph</button>
-        </div>
-      </div>
+      <h2>Valve</h2>
       <span class="phase_chip"><span id="phaseDisplay">--</span></span>
     </div>
 
@@ -79,15 +73,6 @@
         <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
       </div>
       <p id="pressureDisplay"> Not connected yet... </p>
-      <!-- Live trend, last 30 s (graph.js) -->
-      <div class="legend" aria-hidden="true">
-        <span class="key key_pressure">Pressure</span>
-        <span class="key key_target">Target</span>
-      </div>
-      <div class="trend_plot">
-        <canvas id="trendCanvas" role="img" aria-label="Valve pressure and target over the last 30 seconds"></canvas>
-        <p class="trend_empty"><span>Connect to see the last 30 s</span></p>
-      </div>
     </div>
 
     <dl class="stats">
@@ -146,6 +131,21 @@
       </div>
     </section>
   </div>
+
+  <!-- Live pressure trend (graph.js); below the controls so they stay in view -->
+  <section class="card trend" id="trendCard" style="--i:5">
+    <div class="trend_head">
+      <h2>Last 30 s</h2>
+      <div class="legend" aria-hidden="true">
+        <span class="key key_pressure">Pressure</span>
+        <span class="key key_target">Target</span>
+      </div>
+    </div>
+    <div class="trend_plot">
+      <canvas id="trendCanvas" role="img" aria-label="Valve pressure and target over the last 30 seconds"></canvas>
+      <p class="trend_empty"><span>Connect to see live pressure</span></p>
+    </div>
+  </section>
 </main>
 
 </body>

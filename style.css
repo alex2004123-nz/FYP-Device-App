@@ -391,63 +391,12 @@ body:not(.is-connected) .r1 { animation: idle 5s ease-in-out infinite; }
 }
 .link-lost #linkDisplay { color: var(--red); animation: blink 1s ease-in-out infinite; }
 
-/* ---------- Ring / Graph view ---------- */
+/* ---------- Trend graph ---------- */
 
-.hero_title { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.trend_head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.trend_head h2 { margin: 0; }
 
-/* Small segmented switch, same look as the mode control */
-.view_toggle {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--fill-bg);
-}
-.view_btn {
-  padding: .2rem .55rem;
-  border-radius: 6px;
-  font-size: .72rem;
-  font-weight: 500;
-  background: transparent;
-  color: var(--label-2);
-}
-.view_btn:hover { color: var(--label); }
-.view_btn[aria-pressed="true"] {
-  color: var(--label);
-  background: var(--thumb);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .1), 0 1px 1px rgba(0, 0, 0, .04);
-}
-
-/* Graph parts are hidden in ring view */
-.gauge .legend, .gauge .trend_plot { display: none; }
-
-/* Graph view: same box as the ring, so nothing below moves.
-   Reading on the left, legend on the right, plot underneath. */
-.hero.view-graph .gauge {
-  height: clamp(170px, 28dvh, 240px);
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr);
-  place-items: stretch;
-  align-items: end;
-  column-gap: .75rem;
-  row-gap: .6rem;
-}
-.hero.view-graph .breath { display: none; }
-.hero.view-graph .legend { display: flex; align-self: center; }
-.hero.view-graph .trend_plot { display: block; grid-column: 1 / -1; align-self: stretch; }
-
-.hero.view-graph #pressureDisplay { max-width: none; text-align: left; justify-self: start; align-self: center; }
-.is-connected .hero.view-graph #pressureDisplay {
-  flex-direction: row;
-  align-items: baseline;
-  gap: .35rem;
-  font-size: 2.1rem;
-}
-.hero.view-graph .p_unit { margin-top: 0; font-size: .8rem; }
-/* Before connecting, the empty-graph message says it all */
-body:not(.is-connected) .hero.view-graph #pressureDisplay { visibility: hidden; }
-
-.legend { gap: .8rem; }
+.legend { display: flex; gap: .8rem; }
 .key {
   display: inline-flex;
   align-items: center;
@@ -468,12 +417,12 @@ body:not(.is-connected) .hero.view-graph #pressureDisplay { visibility: hidden; 
   border-top: 1.5px dashed var(--blue);
 }
 
-.trend_plot { position: relative; min-height: 0; }
+.trend_plot { position: relative; }
 
 #trendCanvas {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 160px;
 }
 
 .trend_empty {
@@ -490,8 +439,8 @@ body:not(.is-connected) .hero.view-graph #pressureDisplay { visibility: hidden; 
 }
 /* Card-coloured backing so the gridline stops behind the text */
 .trend_empty span { padding: .15rem .6rem; background: var(--card); transition: background .3s var(--ease); }
-.hero.has-data .trend_empty { opacity: 0; }
-.hero:not(.has-data) .legend { opacity: .45; }
+.trend.has-data .trend_empty { opacity: 0; }
+.trend:not(.has-data) .legend { opacity: .45; }
 
 /* ---------- Mode (segmented control) ---------- */
 

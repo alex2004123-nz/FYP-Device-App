@@ -1,6 +1,5 @@
 // Live pressure trend: the last 30 s of valve pressure (orange while inspiratory,
-// teal while expiratory) with the target as a dashed blue line. Shown in the Valve card
-// in place of the ring when "Graph" is picked; the choice is remembered.
+// teal while expiratory) with the target as a dashed blue line.
 // script.js feeds it with Trend.add(); colours come from the stylesheet so it follows the theme.
 const Trend = (() => {
   const WINDOW_MS = 30000;
@@ -8,7 +7,7 @@ const Trend = (() => {
   const MIN_TOP = 20;         // y-axis always shows at least 0-20 cm H2O
   const PAD = { top: 8, right: 26, bottom: 6, left: 2 };
 
-  const card = document.getElementById('valveCard');
+  const card = document.getElementById('trendCard');
   const canvas = document.getElementById('trendCanvas');
   const ctx = canvas.getContext('2d');
   let samples = [];           // { t, p, sp, insp }
@@ -57,7 +56,7 @@ const Trend = (() => {
 
   function draw() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (!w || !h) return; // ring view: graph is hidden
+    if (!w || !h) return; // not laid out yet
     resize();
     ctx.clearRect(0, 0, w, h);
 
@@ -189,21 +188,6 @@ const Trend = (() => {
     }
   });
 
-  // Ring / Graph switch
-  const viewButtons = card.querySelectorAll('.view_btn');
-  function setView(view) {
-    card.classList.toggle('view-graph', view === 'graph');
-    viewButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
-    draw();
-  }
-  viewButtons.forEach((b) => b.addEventListener('click', () => {
-    if (typeof buzz === 'function') buzz(10);
-    setView(b.dataset.view);
-    try { localStorage.setItem('view', b.dataset.view); } catch (e) {}
-  }));
-  let saved = null;
-  try { saved = localStorage.getItem('view'); } catch (e) {}
-  setView(saved === 'graph' ? 'graph' : 'ring');
-
+  draw();
   return { add, clear, setLive };
 })();

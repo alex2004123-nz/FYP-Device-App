@@ -2,7 +2,7 @@
 // and fall back to the last cached copy when there's no connection.
 const CACHE = 'pap-v1';
 const PRECACHE = [
-  './', 'style.css', 'graph.js', 'script.js', 'ui.js', 'theme.js', 'manifest.json',
+  './', 'style.css', 'graph.js', 'script.js', 'ui.js', 'theme.js', 'view.js', 'manifest.json',
   'apple-touch-icon.png', 'favicon-32.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
 ];
 

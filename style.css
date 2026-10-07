@@ -117,8 +117,8 @@ h1 {
 
 .topbar_end { flex: none; display: flex; align-items: center; gap: .75rem; }
 
-/* Theme switch: a small round icon button (moon / sun) */
-.theme_toggle {
+/* Theme switch and gauge/graph switch: small round icon buttons */
+.theme_toggle, .icon_toggle {
   display: inline-flex;
   padding: 0;
   background: none;
@@ -133,7 +133,7 @@ h1 {
   background: var(--fill-bg);
   transition: background .2s var(--ease);
 }
-.theme_toggle:hover .switch_track { background: var(--fill-bg-2); }
+.theme_toggle:hover .switch_track, .icon_toggle:hover .switch_track { background: var(--fill-bg-2); }
 .switch_thumb { display: grid; place-items: center; color: var(--label); }
 .switch_thumb svg { width: 16px; height: 16px; }
 /* Show the theme you'd switch to */
@@ -141,6 +141,10 @@ h1 {
 .switch_thumb .sun { display: none; }
 .theme_toggle[aria-checked="false"] .moon { display: none; }
 .theme_toggle[aria-checked="false"] .sun { display: block; }
+/* Graph icon switches to the graph, gauge icon switches back */
+.switch_thumb .icon_gauge { display: none; }
+[data-view="graph"] .switch_thumb .icon_graph { display: none; }
+[data-view="graph"] .switch_thumb .icon_gauge { display: block; }
 
 .live_dot { display: none; }
 
@@ -391,10 +395,14 @@ body:not(.is-connected) .r1 { animation: idle 5s ease-in-out infinite; }
 }
 .link-lost #linkDisplay { color: var(--red); animation: blink 1s ease-in-out infinite; }
 
-/* ---------- Trend graph ---------- */
+/* ---------- Trend graph (replaces the gauge in graph view) ---------- */
 
-.trend_head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .75rem; }
-.trend_head h2 { margin: 0; }
+.graph_view { display: none; margin: .6rem 0 1rem; }
+[data-view="graph"] .graph_view { display: block; }
+[data-view="graph"] .gauge { display: none; }
+
+.trend_head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+.trend_title { font-size: .72rem; color: var(--label-2); }
 
 .legend { display: flex; gap: .8rem; }
 .key {
@@ -418,7 +426,7 @@ body:not(.is-connected) .r1 { animation: idle 5s ease-in-out infinite; }
 }
 
 /* The box sets the size and the canvas just fills it, so redrawing can never change the layout */
-.trend_plot { position: relative; height: 160px; }
+.trend_plot { position: relative; height: clamp(150px, 24dvh, 210px); }
 
 #trendCanvas {
   position: absolute;

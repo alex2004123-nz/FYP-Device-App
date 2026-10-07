@@ -21,9 +21,28 @@ const MIN_CM_H2O = 4.0;
 const MAX_CM_H2O = 18.0;
 const MODE_NAMES = ["STANDBY", "CPAP", "BIPAP"];
 
+const RECONNECT_ATTEMPTS = 5;
+const PRESSURE_ALARM_CM_H2O = 3.0;  // how far from target counts as off
+const PRESSURE_ALARM_MS = 5000;     // how long it must stay off before alarming
+
+// Vibration patterns (ms on/off); vibration only works on Android, other phones ignore it
+const TAP = 10;
+const ALARM_DISCONNECT = [500, 200, 500, 200, 500];
+const ALARM_LINK_LOST = [300, 150, 300, 150, 300];
+const ALARM_PRESSURE = [200, 100, 200, 100, 200, 100, 200];
+
 let connectedDevice = null;
 let pressureCharacteristic = null;
 let writeCharacteristic = null;
+let live = false;            // fully connected and receiving
+let userDisconnect = false;  // disconnect was asked for, so don't reconnect
+let reconnecting = false;
+let wakeLock = null;
+
+// Alarm state
+let linkWasOk = false;
+let offTargetSince = null;
+let pressureAlarmOn = false;
 
 // Latest values reported by the ESP32 (null until first telemetry); mode starts in Standby
 let device = { ipap: null, epap: null, mode: 0 };
@@ -33,23 +52,73 @@ const $ = (id) => document.getElementById(id);
 $('bluetoothConnect').addEventListener('click', onConnectButton);
 render();
 
-// Connect when disconnected, disconnect when connected
+// Connect when disconnected, disconnect when connected, cancel while reconnecting
 function onConnectButton() {
-  if (connectedDevice && connectedDevice.gatt.connected) {
+  buzz(TAP);
+  if (reconnecting) {
+    cancelReconnect();
+  } else if (connectedDevice && connectedDevice.gatt.connected) {
+    userDisconnect = true;
     connectedDevice.gatt.disconnect(); // fires 'gattserverdisconnected' -> onDisconnected()
   } else {
     connectBluetooth();
   }
 }
 
-// Button text/state: 'idle' | 'busy' | 'connected'
+// Button text/state: 'idle' | 'busy' | 'connected' | 'reconnecting'
 function setButton(state) {
   const btn = $('bluetoothConnect');
   btn.disabled = state === 'busy';
   $('btLabel').innerText =
     state === 'connected' ? 'Disconnect' :
+    state === 'reconnecting' ? 'Cancel' :
     state === 'busy' ? 'Connecting…' : 'Connect Bluetooth';
 }
+
+function buzz(pattern) {
+  if (navigator.vibrate) {
+    navigator.vibrate(pattern);
+  } else {
+    iosHaptic();
+  }
+}
+
+// iPhones have no vibrate API, but since iOS 18 toggling a native "switch" checkbox
+// gives a haptic tick. Only works during a tap, so alarms stay silent on iPhone.
+function iosHaptic() {
+  try {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    label.style.display = 'none';
+    label.appendChild(input);
+    document.head.appendChild(label);
+    label.click();
+    label.remove();
+  } catch (error) {
+    // no haptics available
+  }
+}
+
+// Keep the screen from dimming/locking while connected
+async function keepScreenOn(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (error) {
+    console.warn('Wake lock:', error);
+  }
+}
+// The browser drops the wake lock when the app is hidden; take it again on return
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && (live || reconnecting)) keepScreenOn(true);
+});
 
 // Short, readable versions of the common Web Bluetooth errors
 function friendlyError(error) {
@@ -75,6 +144,7 @@ $('epapUp').addEventListener('click', () => adjust('EPAP', +STEP_CM_H2O));
 $('epapDown').addEventListener('click', () => adjust('EPAP', -STEP_CM_H2O));
 document.querySelectorAll('.mode_btn').forEach((btn) =>
   btn.addEventListener('click', () => {
+    buzz(TAP);
     // Update the screen straight away; the next telemetry confirms it
     device.mode = MODE_NAMES.indexOf(btn.dataset.mode);
     render();
@@ -96,6 +166,7 @@ async function sendText(text) {
 }
 
 function adjust(which, delta) {
+  buzz(TAP);
   const current = which === 'IPAP' ? device.ipap : device.epap;
   if (current === null) return; // wait for first telemetry
   const next = Math.min(MAX_CM_H2O, Math.max(MIN_CM_H2O, current + delta));
@@ -135,6 +206,7 @@ function handlePressureData(event) {
       $('phaseDisplay').innerText = (flags & 0x01) ? "Inspiratory" : "Expiratory";
       $('linkDisplay').innerText = (flags & 0x02) ? "OK" : "LOST";
       render();
+      checkAlarms(pressure, setpoint, (flags & 0x02) !== 0);
     }
 
     if (v.byteLength >= 22 && (v.getUint8(17) & 0x04)) {
@@ -146,6 +218,31 @@ function handlePressureData(event) {
   } catch (error) {
     $('pressureDisplay').innerText = `Error: ${error.message}`;
   }
+}
+
+// Vibrate once when the valve link drops, or when the pressure has been
+// far from target for a while (not in Standby)
+function checkAlarms(pressure, setpoint, linkOk) {
+  if (linkWasOk && !linkOk) buzz(ALARM_LINK_LOST);
+  linkWasOk = linkOk;
+
+  const offTarget = MODE_NAMES[device.mode] !== 'STANDBY' &&
+    Math.abs(pressure - setpoint) > PRESSURE_ALARM_CM_H2O;
+  if (!offTarget) {
+    offTargetSince = null;
+    pressureAlarmOn = false;
+  } else if (offTargetSince === null) {
+    offTargetSince = Date.now();
+  } else if (!pressureAlarmOn && Date.now() - offTargetSince > PRESSURE_ALARM_MS) {
+    pressureAlarmOn = true;
+    buzz(ALARM_PRESSURE);
+  }
+}
+
+function resetAlarms() {
+  linkWasOk = false;
+  offTargetSince = null;
+  pressureAlarmOn = false;
 }
 
 function render() {
@@ -178,23 +275,13 @@ async function connectBluetooth() {
       filters: [{ services: [SERVICE_UUID] }, { namePrefix: "PAP" }],
       optionalServices: [SERVICE_UUID],
     });
+    // Remove first: picking the same device again can return the same object
+    connectedDevice.removeEventListener('gattserverdisconnected', onDisconnected);
     connectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
     setStatus("Device found");
 
-    const gattServer = await connectedDevice.gatt.connect();
-    setStatus("GATT connected");
-
-    const service = await gattServer.getPrimaryService(SERVICE_UUID);
-    setStatus("Service found");
-
-    pressureCharacteristic = await service.getCharacteristic(PRESSURE_CHAR_UUID);
-    writeCharacteristic = await service.getCharacteristic(WRITE_CHARACTERISTIC_UUID);
-    setStatus("Characteristics found");
-
-    await pressureCharacteristic.startNotifications();
-    pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
-    setStatus(`Connected to ${connectedDevice.name || 'device'}`);
-    setButton('connected');
+    await openGatt();
+    markConnected();
   } catch (error) {
     console.error('Bluetooth Error:', error);
     setStatus(`Error: ${friendlyError(error)}`);
@@ -202,12 +289,89 @@ async function connectBluetooth() {
   }
 }
 
+// GATT connect + characteristics + notifications (used for first connect and reconnects)
+async function openGatt() {
+  const gattServer = await connectedDevice.gatt.connect();
+  setStatus("GATT connected");
+
+  const service = await gattServer.getPrimaryService(SERVICE_UUID);
+  setStatus("Service found");
+
+  pressureCharacteristic = await service.getCharacteristic(PRESSURE_CHAR_UUID);
+  writeCharacteristic = await service.getCharacteristic(WRITE_CHARACTERISTIC_UUID);
+  setStatus("Characteristics found");
+
+  await pressureCharacteristic.startNotifications();
+  pressureCharacteristic.removeEventListener('characteristicvaluechanged', handlePressureData);
+  pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
+}
+
+function markConnected() {
+  live = true;
+  setStatus(`Connected to ${connectedDevice.name || 'device'}`);
+  setButton('connected');
+  keepScreenOn(true);
+}
+
 function onDisconnected() {
+  const wasLive = live;
+  live = false;
   writeCharacteristic = null;
   pressureCharacteristic = null;
   device = { ipap: null, epap: null, mode: 0 };
   render();
+  resetAlarms();
+  $('linkDisplay').innerText = "--";
+
+  if (reconnecting) return; // the reconnect loop carries on
+  if (wasLive && !userDisconnect) {
+    buzz(ALARM_DISCONNECT);
+    reconnect();
+    return;
+  }
+  userDisconnect = false;
   setStatus("Disconnected");
   setButton('idle');
-  $('linkDisplay').innerText = "--";
+  keepScreenOn(false);
+}
+
+// Unexpected drop: try the same device again a few times, waiting a bit longer each time
+async function reconnect() {
+  reconnecting = true;
+  setButton('reconnecting');
+  for (let attempt = 1; attempt <= RECONNECT_ATTEMPTS; attempt++) {
+    setStatus(`Reconnecting (${attempt}/${RECONNECT_ATTEMPTS})`);
+    try {
+      await openGatt();
+      if (!reconnecting) { // cancelled while connecting
+        connectedDevice.gatt.disconnect();
+        return;
+      }
+      reconnecting = false;
+      markConnected();
+      return;
+    } catch (error) {
+      console.warn(`Reconnect ${attempt} failed:`, error);
+    }
+    if (!reconnecting) return;
+    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    if (!reconnecting) return;
+  }
+  reconnecting = false;
+  setStatus("Error: reconnect failed");
+  setButton('idle');
+  keepScreenOn(false);
+}
+
+function cancelReconnect() {
+  reconnecting = false;
+  if (connectedDevice) connectedDevice.gatt.disconnect(); // also stops a connect in progress
+  setStatus("Disconnected");
+  setButton('idle');
+  keepScreenOn(false);
+}
+
+// Offline support (see sw.js)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((error) => console.warn('Service worker:', error));
 }

@@ -11,3 +11,11 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+cloudflare:
+  stage: deploy
+  image: node:22-alpine
+  script:
+    - npx --yes wrangler pages deploy . --project-name=pap-device-app --branch=PAP_Bluetooth --commit-dirty=true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

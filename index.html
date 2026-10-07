@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#f4f0e8">
+    <meta name="theme-color" content="#f2f2f7">
     <title>PAP Device</title>
     <script>
       // Apply the saved theme (light by default) before first paint to avoid a flash
@@ -14,17 +14,12 @@
         document.documentElement.dataset.theme = theme;
       })();
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="script.js" defer></script>
     <script src="ui.js" defer></script>
     <script src="theme.js" defer></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<div class="grain" aria-hidden="true"></div>
 
 <header class="topbar">
   <div class="brand">
@@ -65,7 +60,7 @@
   <!-- Live readings (PEEP -> ESP32 -> phone) -->
   <section class="card hero" style="--i:1">
     <div class="hero_head">
-      <h2>Pressure</h2>
+      <h2>PEEP Pressure</h2>
       <span class="phase_chip"><span id="phaseDisplay">--</span></span>
     </div>
 
@@ -77,6 +72,10 @@
     </div>
 
     <dl class="stats">
+      <div class="stat">
+        <dt>Blower</dt>
+        <dd class="small"><span id="blowerDisplay">--</span></dd>
+      </div>
       <div class="stat">
         <dt>Target</dt>
         <dd class="small"><span id="setPressureDisplay">--</span></dd>

@@ -4,11 +4,12 @@
 // Phone -> ESP32 (write, UTF-8 text):
 //   "IPAP=12.5", "EPAP=5.0", "MODE=STANDBY" | "MODE=CPAP" | "MODE=BIPAP"
 //
-// ESP32 -> Phone (notify, 18 bytes, little-endian):
-//   [0]  float32 measured pressure   [4]  float32 active setpoint
+// ESP32 -> Phone (notify, 22 bytes, little-endian; 18-byte packets still accepted):
+//   [0]  float32 PEEP valve pressure [4]  float32 active setpoint
 //   [8]  float32 flow (L/min)        [12] int16 IPAP x100
 //   [14] int16 EPAP x100             [16] uint8 mode (0/1/2)
-//   [17] uint8 flags (bit0 inspiratory, bit1 valve link OK)
+//   [17] uint8 flags (bit0 inspiratory, bit1 valve link OK, bit2 blower sensor OK)
+//   [18] float32 blower pressure
 // ============================================================
 
 const SERVICE_UUID = "12345678-1234-1234-1234-123456789abc";
@@ -24,12 +25,13 @@ let connectedDevice = null;
 let pressureCharacteristic = null;
 let writeCharacteristic = null;
 
-// Latest values reported by the ESP32 (null until first telemetry)
-let device = { ipap: null, epap: null, mode: null };
+// Latest values reported by the ESP32 (null until first telemetry); mode starts in Standby
+let device = { ipap: null, epap: null, mode: 0 };
 
 const $ = (id) => document.getElementById(id);
 
 $('bluetoothConnect').addEventListener('click', onConnectButton);
+render();
 
 // Connect when disconnected, disconnect when connected
 function onConnectButton() {
@@ -134,6 +136,13 @@ function handlePressureData(event) {
       $('linkDisplay').innerText = (flags & 0x02) ? "OK" : "LOST";
       render();
     }
+
+    if (v.byteLength >= 22 && (v.getUint8(17) & 0x04)) {
+      const blower = v.getFloat32(18, true);
+      $('blowerDisplay').innerText = blower.toFixed(2) + " cm H₂O";
+    } else {
+      $('blowerDisplay').innerText = "--";
+    }
   } catch (error) {
     $('pressureDisplay').innerText = `Error: ${error.message}`;
   }
@@ -196,7 +205,8 @@ async function connectBluetooth() {
 function onDisconnected() {
   writeCharacteristic = null;
   pressureCharacteristic = null;
-  device = { ipap: null, epap: null, mode: null };
+  device = { ipap: null, epap: null, mode: 0 };
+  render();
   setStatus("Disconnected");
   setButton('idle');
   $('linkDisplay').innerText = "--";

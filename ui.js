@@ -4,6 +4,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const body = document.body;
+  const RING_MAX_CM_H2O = 20;
 
   function sync() {
     const status = $('connect_status').textContent.trim();
@@ -18,10 +19,16 @@
     body.classList.toggle('phase-exp', phase === 'Expiratory');
     body.classList.toggle('link-ok', link === 'OK');
     body.classList.toggle('link-lost', link === 'LOST');
+
+    // Gauge ring fills with the pressure, 0 to RING_MAX_CM_H2O
+    const pressure = parseFloat($('pressureDisplay').textContent);
+    const fill = body.classList.contains('is-connected') && Number.isFinite(pressure)
+      ? Math.min(Math.max(pressure / RING_MAX_CM_H2O, 0), 1) : 0;
+    body.style.setProperty('--fill', fill);
   }
 
   const observer = new MutationObserver(sync);
-  ['connect_status', 'phaseDisplay', 'linkDisplay'].forEach((id) =>
+  ['connect_status', 'phaseDisplay', 'linkDisplay', 'pressureDisplay'].forEach((id) =>
     observer.observe($(id), { childList: true, characterData: true, subtree: true })
   );
   sync();

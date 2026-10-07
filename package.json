@@ -1,0 +1,7 @@
+{
+  "name": "pap-device-app",
+  "private": true,
+  "scripts": {
+    "deploy": "npx wrangler pages deploy . --project-name=pap-device-app --branch=PAP_Bluetooth --commit-dirty=true"
+  }
+}

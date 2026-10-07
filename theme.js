@@ -4,7 +4,7 @@
   const toggle = document.getElementById('themeToggle');
   const label = toggle.querySelector('.switch_label');
   const meta = document.querySelector('meta[name="theme-color"]');
-  const COLORS = { dark: '#0e1113', light: '#f4f0e8' };
+  const COLORS = { dark: '#000000', light: '#f2f2f7' };
 
   function apply(theme) {
     root.dataset.theme = theme;

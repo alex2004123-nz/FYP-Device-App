@@ -20,7 +20,9 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    // no-cache: always check the server, so a new deploy never mixes with old cached files
+    // (page loads can't take options, and the browser checks those anyway)
+    (request.mode === 'navigate' ? fetch(request) : fetch(request, { cache: 'no-cache' }))
       .then((response) => {
         // Redirected responses can't be replayed for page loads, so don't cache them
         if (response.ok && !response.redirected) {

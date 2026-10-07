@@ -43,21 +43,28 @@ const Trend = (() => {
     return getComputedStyle(document.body).getPropertyValue(name).trim();
   }
 
-  function resize() {
+  // Size comes from the .trend_plot box, capped so the canvas can never grow itself
+  // (if its CSS height were missing, each redraw would make it taller)
+  const MAX_H = 300;
+  function size() {
+    const box = canvas.parentElement;
+    return { w: box.clientWidth, h: Math.min(box.clientHeight, MAX_H) };
+  }
+
+  function resize(w, h) {
     const dpr = window.devicePixelRatio || 1;
-    const w = Math.round(canvas.clientWidth * dpr);
-    const h = Math.round(canvas.clientHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
+    const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   function draw() {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const { w, h } = size();
     if (!w || !h) return; // not laid out yet
-    resize();
+    resize(w, h);
     ctx.clearRect(0, 0, w, h);
 
     const plotW = w - PAD.left - PAD.right;
@@ -176,7 +183,7 @@ const Trend = (() => {
   }
 
   // Redraw on resize and theme change
-  new ResizeObserver(() => { if (!running) draw(); }).observe(canvas);
+  new ResizeObserver(() => { if (!running) draw(); }).observe(canvas.parentElement);
   new MutationObserver(() => { if (!running) draw(); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   // Don't animate in the background

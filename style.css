@@ -417,12 +417,15 @@ body:not(.is-connected) .r1 { animation: idle 5s ease-in-out infinite; }
   border-top: 1.5px dashed var(--blue);
 }
 
-.trend_plot { position: relative; }
+/* The box sets the size and the canvas just fills it, so redrawing can never change the layout */
+.trend_plot { position: relative; height: 160px; }
 
 #trendCanvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  height: 160px;
+  height: 100%;
 }
 
 .trend_empty {

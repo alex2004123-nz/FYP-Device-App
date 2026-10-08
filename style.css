@@ -1,80 +1,646 @@
+/* ============================================================
+   Minimal Apple-style theme. The page is neutral (white / grey /
+   black); colour is used sparingly and always means the same thing:
+     orange = inspiratory / IPAP     teal   = expiratory / EPAP / CPAP
+     pink   = blower pressure        purple = flow
+     blue   = target / idle          green / red = OK / error
+   ============================================================ */
+
+/* Ring fill (0-1), set by ui.js from the pressure; registered so it animates */
+@property --fill {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+:root {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --fill-bg: rgba(0, 0, 0, .05);
+  --fill-bg-2: rgba(0, 0, 0, .09);
+  --thumb: #ffffff;
+  --separator: rgba(0, 0, 0, .08);
+  --label: #1d1d1f;
+  --label-2: #86868b;
+  --label-3: #c7c7cc;
+  --invert: #1d1d1f;      /* solid button */
+  --on-invert: #ffffff;
+
+  --orange: #ff9500;
+  --pink: #ff2d55;
+  --purple: #af52de;
+  --blue: #007aff;
+  --teal: #30b0c7;
+  --green: #34c759;
+  --red: #ff3b30;
+
+  --accent: var(--blue);
+  color-scheme: light;
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 22px;
+  --ease: cubic-bezier(.25, .1, .25, 1);
+  --spring: cubic-bezier(.32, .72, 0, 1);
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --card: #121214;
+  --fill-bg: rgba(255, 255, 255, .07);
+  --fill-bg-2: rgba(255, 255, 255, .12);
+  --thumb: #2c2c2e;
+  --separator: rgba(255, 255, 255, .08);
+  --label: #f5f5f7;
+  --label-2: #8e8e93;
+  --label-3: #48484a;
+  --invert: #f5f5f7;
+  --on-invert: #000000;
+
+  --orange: #ff9f0a;
+  --pink: #ff375f;
+  --purple: #bf5af2;
+  --blue: #0a84ff;
+  --teal: #40c8e0;
+  --green: #30d158;
+  --red: #ff453a;
+  color-scheme: dark;
+}
+
+/* Gauge and phase badge follow the breath phase */
+body.phase-insp { --accent: var(--orange); }
+body.phase-exp { --accent: var(--teal); }
+
+* { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f5f5f7;
+  font-family: var(--font);
+  color: var(--label);
+  background: var(--bg);
   margin: 0;
-  padding: 1rem;
+  min-height: 100vh;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem calc(1.25rem + env(safe-area-inset-bottom));
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .3s var(--ease), color .3s var(--ease), --fill .25s linear;
 }
 
-.layout {
+.grain { display: none; }
 
-  /* justify-content: center; Centers horizontally */
-  align-items: center;     /* Centers vertically */
-  text-align: center;
-    
+/* ---------- Header ---------- */
+
+.topbar {
+  max-width: 440px;
+  margin: .25rem auto 1.25rem;
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+  justify-content: space-between;
+  animation: rise .7s var(--spring) both;
 }
+
+.brand { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+
+.brand_mark { flex: none; width: 22px; height: 22px; color: var(--accent); transition: color .5s var(--ease); }
+.brand_mark circle { display: none; }
 
 h1 {
-  text-align: center;
-  font-size: 1.5rem;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
-.layout h2 {
-  margin: 0.5rem 0 0;
-}
+.topbar_end { flex: none; display: flex; align-items: center; gap: .75rem; }
 
-#connect_status,
-#pressureDisplay {
-  color: #555;
-  font-size: 1rem;
+/* Theme switch and gauge/graph switch: small round icon buttons */
+.theme_toggle, .icon_toggle {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  color: var(--label-2);
 }
-
-#setPressureDisplay {
-  font-size: 3rem;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 0.25rem 0;
-}
-
-button {
-  width: 64px;
-  height: 64px;
-  border: none;
+.theme_toggle .switch_label { display: none; }
+.switch_track {
+  width: 34px; height: 34px;
   border-radius: 50%;
-  background: #2563eb;
-  color: white;
-  font-size: 2rem;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  background: var(--fill-bg);
+  transition: background .2s var(--ease);
+}
+.theme_toggle:hover .switch_track, .icon_toggle:hover .switch_track { background: var(--fill-bg-2); }
+.switch_thumb { display: grid; place-items: center; color: var(--label); }
+.switch_thumb svg { width: 16px; height: 16px; }
+/* Show the theme you'd switch to */
+.switch_thumb .moon { display: block; }
+.switch_thumb .sun { display: none; }
+.theme_toggle[aria-checked="false"] .moon { display: none; }
+.theme_toggle[aria-checked="false"] .sun { display: block; }
+/* Graph icon switches to the graph, gauge icon switches back */
+.switch_thumb .icon_gauge { display: none; }
+[data-view="graph"] .switch_thumb .icon_graph { display: none; }
+[data-view="graph"] .switch_thumb .icon_gauge { display: block; }
+
+.live_dot { display: none; }
+
+/* ---------- Layout ---------- */
+
+.layout {
+  max-width: 440px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .75rem;
+}
+
+/* Never let a child push the column wider than the screen */
+.layout > *, .card, .setpoints > * { min-width: 0; }
+
+h2 {
+  margin: 0 0 .9rem;
+  font-size: .8rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--label-2);
+}
+
+.card {
+  position: relative;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.15rem 1.2rem 1.2rem;
+  transition: background .3s var(--ease);
+  animation: rise .7s var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 80ms);
+}
+
+/* ---------- Connection ---------- */
+
+.connect_panel {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: 0 .1rem;
+  animation: rise .7s var(--spring) both .04s;
+}
+
+.status_line { flex: 1 1 auto; display: flex; align-items: center; gap: .55rem; min-width: 0; }
+
+.status_led {
+  flex: none;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--label-3);
+  transition: background .3s var(--ease);
+}
+.is-busy .status_led { background: var(--orange); animation: blink .9s ease-in-out infinite; }
+.is-connected .status_led { background: var(--green); }
+.is-error .status_led { background: var(--red); }
+
+#connect_status {
+  margin: 0;
+  font-size: .85rem;
+  line-height: 1.3;
+  color: var(--label-2);
+  /* Wrap onto a second line rather than cutting the text off */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.is-connected #connect_status { color: var(--label); }
+.is-error #connect_status { color: var(--red); }
+
+.bt_wrapper { flex: none; }
+
+/* ---------- Buttons ---------- */
+
+button {
+  font-family: var(--font);
+  border: none;
+  color: var(--label);
+  cursor: pointer;
   touch-action: manipulation;
+  transition: transform .2s var(--spring), background .2s var(--ease), color .2s var(--ease), opacity .2s;
 }
+button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+button:active { transform: scale(.96); }
 
-.bt_button {
-    margin-right: 20px;
-}
-
-button:active {
-  background: #1d4ed8;
-  transform: scale(0.95);
-}
-
+/* Solid monochrome pill */
 #bluetoothConnect {
-  width: auto;
-  height: auto;
-  border-radius: 8px;
-  padding: 0.6rem 1.2rem;
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .55rem 1rem .55rem .8rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--on-invert);
+  background: var(--invert);
+}
+#bluetoothConnect svg { width: 15px; height: 15px; }
+#bluetoothConnect:hover { opacity: .85; }
+#bluetoothConnect:disabled { opacity: .45; cursor: progress; }
+/* Disconnect: quiet secondary pill */
+.is-connected #bluetoothConnect {
+  color: var(--label);
+  background: var(--fill-bg);
+}
+.is-connected #bluetoothConnect:hover { color: var(--red); opacity: 1; }
+
+/* ---------- Hero / Pressure ---------- */
+
+.hero { padding-bottom: 1.1rem; }
+
+.hero_head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.hero_head h2 { margin: 0; }
+
+.phase_chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .8rem;
+  font-weight: 500;
+  color: var(--label-2);
+  white-space: nowrap;
+  transition: color .4s var(--ease);
+}
+.phase_chip::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--label-3);
+  transition: background .4s var(--ease);
+}
+.phase-insp .phase_chip, .phase-exp .phase_chip { color: var(--accent); }
+.phase-insp .phase_chip::before, .phase-exp .phase_chip::before { background: var(--accent); }
+body:not(.phase-insp):not(.phase-exp) .phase_chip { visibility: hidden; }
+
+.gauge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* Scales with screen height so the pressure controls stay in view */
+  min-height: clamp(170px, 28dvh, 240px);
+  margin: .6rem 0 1rem;
 }
 
-.bt_wrapper {
-    text-align: center;
+/* Thin ring: a faint track with an arc that fills with the pressure */
+.breath { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+
+.ring {
+  --size: 210px;
+  --stroke: 6px;
+  position: absolute;
+  width: var(--size); height: var(--size);
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--stroke)), #000 calc(100% - var(--stroke) + .5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--stroke)), #000 calc(100% - var(--stroke) + .5px));
+}
+.r1 { background: var(--fill-bg-2); }
+.r2 {
+  background: conic-gradient(var(--accent) calc(var(--fill) * 360deg), transparent 0);
+  transition: background .5s var(--ease);
+}
+.r3 { display: none; }
+
+/* Idle: the track breathes slowly until connected */
+body:not(.is-connected) .r1 { animation: idle 5s ease-in-out infinite; }
+
+#pressureDisplay {
+  position: relative;
+  margin: 0;
+  max-width: 130px;
+  text-align: center;
+  font-size: .9rem;
+  line-height: 1.3;
+  color: var(--label-2);
+  overflow-wrap: anywhere;
+}
+.is-connected #pressureDisplay {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--display);
+  font-size: clamp(3rem, 15vw, 3.75rem);
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  overflow-wrap: normal;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
 }
 
-.center-btn {
+.p_unit {
+  margin-top: .45em;
+  font-family: var(--font);
+  font-size: .22em;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--label-2);
+}
+
+/* ---------- Stats ---------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .5rem;
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--separator);
+}
+
+.stat { min-width: 0; }
+
+/* Label with a small colour dot */
+.stat dt {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .72rem;
+  color: var(--label-2);
+  margin-bottom: .3rem;
+  white-space: nowrap;
+}
+.stat dt::before {
+  content: "";
+  flex: none;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--dot, var(--label-3));
+}
+.stat:nth-child(1) { --dot: var(--pink); }
+.stat:nth-child(2) { --dot: var(--blue); }
+.stat:nth-child(3) { --dot: var(--purple); }
+.link-ok .stat:nth-child(4) { --dot: var(--green); }
+.link-lost .stat:nth-child(4) { --dot: var(--red); }
+
+.small {
+  margin: 0;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.link-lost #linkDisplay { color: var(--red); animation: blink 1s ease-in-out infinite; }
+
+/* ---------- Trend graph (replaces the gauge in graph view) ---------- */
+
+.graph_view { display: none; margin: .6rem 0 1rem; }
+[data-view="graph"] .graph_view { display: block; }
+[data-view="graph"] .gauge { display: none; }
+
+.trend_head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+.trend_title { font-size: .72rem; color: var(--label-2); }
+
+.legend { display: flex; gap: .8rem; }
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .72rem;
+  color: var(--label-2);
+  white-space: nowrap;
+}
+.key::before { content: ""; flex: none; }
+/* Pressure: half orange / half teal like the BiPAP dot; target: short dashed blue line */
+.key_pressure::before {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--orange) 50%, var(--teal) 50%);
+}
+.key_target::before {
+  width: 12px; height: 0;
+  border-top: 1.5px dashed var(--blue);
+}
+
+/* The box sets the size and the canvas just fills it, so redrawing can never change the layout */
+.trend_plot { position: relative; height: clamp(150px, 24dvh, 210px); }
+
+#trendCanvas {
+  position: absolute;
+  inset: 0;
   display: block;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.trend_empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding-right: 26px; /* centre over the plot, not the axis labels */
+  font-size: .82rem;
+  color: var(--label-2);
+  pointer-events: none;
+  transition: opacity .3s var(--ease);
+}
+/* Card-coloured backing so the gridline stops behind the text */
+.trend_empty span { padding: .15rem .6rem; background: var(--card); transition: background .3s var(--ease); }
+.trend.has-data .trend_empty { opacity: 0; }
+.trend:not(.has-data) .legend { opacity: .45; }
+
+/* ---------- Mode (segmented control) ---------- */
+
+.mode_row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--fill-bg);
+}
+
+/* Each mode has its own colour: grey standby, teal CPAP, orange BiPAP
+   (BiPAP's dot is half orange / half teal as it uses both pressures) */
+.mode_btn {
+  --mc: var(--label-2);
+  --dot: var(--mc);
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: .6rem .25rem;
+  border-radius: 9px;
+  font-size: .88rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--label-2);
+}
+.mode_btn[data-mode="CPAP"] { --mc: var(--teal); }
+.mode_btn[data-mode="BIPAP"] { --mc: var(--orange); --dot: linear-gradient(90deg, var(--orange) 50%, var(--teal) 50%); }
+.mode_btn::before {
+  content: "";
+  flex: none;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--dot);
+  opacity: .45;
+  transition: opacity .2s var(--ease);
+}
+.mode_btn:hover { color: var(--label); }
+
+.mode_btn.active {
+  color: var(--mc);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--mc) 12%, var(--thumb));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .1), 0 1px 1px rgba(0, 0, 0, .04);
+}
+.mode_btn.active::before { opacity: 1; }
+
+/* ---------- Setpoints ---------- */
+
+.setpoints {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  gap: .75rem;
+}
+
+.setpoint { container-type: inline-size; --tone: var(--teal); }
+.setpoint.insp { --tone: var(--orange); }
+
+.setpoint h2 { display: flex; align-items: center; gap: .4rem; }
+.setpoint h2::before {
+  content: "";
+  flex: none;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.adjust_row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.value_wrap { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+
+.set_value {
+  font-family: var(--display);
+  font-size: 2.6rem;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  margin-top: .35rem;
+  font-size: .72rem;
+  color: var(--label-2);
+}
+
+.round_btn {
+  flex: none;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  font-size: 1.35rem;
+  font-weight: 300;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--label);
+  background: var(--fill-bg);
+}
+.round_btn:hover { background: var(--fill-bg-2); }
+.round_btn:active { color: #fff; background: var(--tone); }
+
+/* Side-by-side cards are narrow: put the number on top and the -/+ buttons in a row below */
+@container (max-width: 250px) {
+  .adjust_row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "value value" "down up";
+    gap: .6rem;
+  }
+  .value_wrap { grid-area: value; margin-bottom: .35rem; }
+  .adjust_row .round_btn:first-child { grid-area: down; }
+  .adjust_row .round_btn:last-child { grid-area: up; }
+  .round_btn { width: 100%; height: 40px; border-radius: 12px; }
+  .set_value { font-size: clamp(2.2rem, 22cqi, 2.8rem); }
+}
+
+/* ---------- Motion ---------- */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes idle {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Phones: tighten spacing so everything fits the screen */
+@media (max-width: 520px) {
+  body { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+  .card { padding: 1rem 1rem 1.05rem; }
+  .ring { --size: clamp(150px, 26dvh, 190px); }
+}
+
+/* Short screens (e.g. iPhone 13 in Safari/Bluefy, or as a home-screen app with the notch):
+   trim spacing and let the gauge/graph shrink so the IPAP/EPAP buttons fit without scrolling */
+@media (max-height: 820px) {
+  body {
+    padding-top: max(.6rem, env(safe-area-inset-top));
+    padding-bottom: calc(.6rem + env(safe-area-inset-bottom));
+  }
+  .topbar { margin: 0 auto .7rem; }
+  .layout { gap: .6rem; }
+  .card { padding: .85rem 1rem .9rem; }
+  h2 { margin-bottom: .6rem; }
+
+  /* Gauge/graph get whatever height is left after the rest of the page (~490px) */
+  .gauge { min-height: clamp(130px, 100dvh - 495px, 240px); margin: .2rem 0 .6rem; }
+  .ring { --size: clamp(124px, 100dvh - 515px, 190px); }
+  .graph_view { margin: .2rem 0 .6rem; }
+  .trend_plot { height: clamp(120px, 100dvh - 515px, 210px); }
+  .stats { padding-top: .7rem; }
+
+  .mode_btn { padding: .5rem .25rem; }
+  .set_value { font-size: 2.3rem; }
+  .unit { margin-top: .25rem; }
+  .round_btn { width: 44px; height: 44px; }
+  @container (max-width: 250px) {
+    .value_wrap { margin-bottom: .2rem; }
+    .round_btn { width: 100%; height: 36px; }
+  }
+}
+
+@media (max-width: 360px) {
+  .is-connected #pressureDisplay { font-size: 2.6rem; }
+  .mode_btn { font-size: .82rem; }
+  .small { font-size: .74rem; }
 }
 
 .pap-btn {

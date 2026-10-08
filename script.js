@@ -1,137 +1,382 @@
-console.log("JavaScript is successfully connected!");
+// ============================================================
+// PAP Device app  <--BLE-->  ESP32  <--UART-->  PEEP valve
+//
+// Phone -> ESP32 (write, UTF-8 text):
+//   "IPAP=12.5", "EPAP=5.0", "MODE=STANDBY" | "MODE=CPAP" | "MODE=BIPAP"
+//
+// ESP32 -> Phone (notify, 22 bytes, little-endian; 18-byte packets still accepted):
+//   [0]  float32 PEEP valve pressure [4]  float32 active setpoint
+//   [8]  float32 flow (L/min)        [12] int16 IPAP x100
+//   [14] int16 EPAP x100             [16] uint8 mode (0/1/2)
+//   [17] uint8 flags (bit0 inspiratory, bit1 valve link OK, bit2 blower sensor OK)
+//   [18] float32 blower pressure
+// ============================================================
 
-const button = document.getElementById('bluetoothConnect');
-const increaseExpirButton = document.getElementById('increaseExpirButton');
-const decreaseExpirButton = document.getElementById('decreaseExpirButton');
-
-const increaseInspirButton = document.getElementById('increaseInspirButton');
-const decreaseInspirButton = document.getElementById('decreaseInspirButton');
-
-const CPAPButton = document.getElementById('CPAP');
-const BiPAPButton = document.getElementById('BiPAP');
-const APAPButton = document.getElementById('APAP');
-
-const SERVICE_UUID =  "12345678-1234-1234-1234-123456789abc";
+const SERVICE_UUID = "12345678-1234-1234-1234-123456789abc";
 const PRESSURE_CHAR_UUID = "87654321-4321-4321-4321-cba987654321";
-const WRITE_CHARACTERISTIC_UUID = "87654321-4321-4321-4321-cba987655676";  
+const WRITE_CHARACTERISTIC_UUID = "87654321-4321-4321-4321-cba987655676";
 
-let papState = 0;
+const STEP_CM_H2O = 0.5;
+const MIN_CM_H2O = 4.0;
+const MAX_CM_H2O = 18.0;
+const MODE_NAMES = ["STANDBY", "CPAP", "BIPAP"];
+
+const RECONNECT_ATTEMPTS = 5;
+const PRESSURE_ALARM_CM_H2O = 3.0;  // how far from target counts as off
+const PRESSURE_ALARM_MS = 5000;     // how long it must stay off before alarming
+
+// Vibration patterns (ms on/off); vibration only works on Android, other phones ignore it
+const TAP = 10;
+const ALARM_DISCONNECT = [500, 200, 500, 200, 500];
+const ALARM_LINK_LOST = [300, 150, 300, 150, 300];
+const ALARM_PRESSURE = [200, 100, 200, 100, 200, 100, 200];
 
 let connectedDevice = null;
-let gattServer = null;
-let bluetoothService = null;
 let pressureCharacteristic = null;
-let writeCharacteristic = null;;
-let motorControlCharacteristic = null;
+let writeCharacteristic = null;
+let live = false;            // fully connected and receiving
+let userDisconnect = false;  // disconnect was asked for, so don't reconnect
+let reconnecting = false;
+let wakeLock = null;
 
-button.addEventListener('click', connectBluetooth);
-increaseExpirButton.addEventListener('click', () => sendCommandOld('increase'));
-decreaseExpirButton.addEventListener('click', () => sendCommand(0, 0));
-increaseInspirButton.addEventListener('click', () => sendCommand(1, 1));
-decreaseInspirButton.addEventListener('click', () => sendCommand(1, 0));
-CPAPButton.addEventListener('click', () => changePAPState(0));
-BiPAPButton.addEventListener('click', () => changePAPState(1));
-APAPButton.addEventListener('click', () => changePAPState(2));
+// Alarm state
+let linkWasOk = false;
+let offTargetSince = null;
+let pressureAlarmOn = false;
 
-function handlePressureData(event) {
+// Latest values reported by the ESP32 (null until first telemetry); mode starts in Standby
+let device = { ipap: null, epap: null, mode: 0 };
+
+const $ = (id) => document.getElementById(id);
+
+$('bluetoothConnect').addEventListener('click', onConnectButton);
+render();
+
+// Connect when disconnected, disconnect when connected, cancel while reconnecting
+function onConnectButton() {
+  buzz(TAP);
+  if (reconnecting) {
+    cancelReconnect();
+  } else if (connectedDevice && connectedDevice.gatt.connected) {
+    userDisconnect = true;
+    connectedDevice.gatt.disconnect(); // fires 'gattserverdisconnected' -> onDisconnected()
+  } else {
+    connectBluetooth();
+  }
+}
+
+// Button text/state: 'idle' | 'busy' | 'connected' | 'reconnecting'
+function setButton(state) {
+  const btn = $('bluetoothConnect');
+  btn.disabled = state === 'busy';
+  $('btLabel').innerText =
+    state === 'connected' ? 'Disconnect' :
+    state === 'reconnecting' ? 'Cancel' :
+    state === 'busy' ? 'Connecting…' : 'Connect Bluetooth';
+}
+
+function buzz(pattern) {
+  if (navigator.vibrate) {
+    navigator.vibrate(pattern);
+  } else {
+    iosHaptic();
+  }
+}
+
+// iPhones have no vibrate API, but since iOS 18 toggling a native "switch" checkbox
+// gives a haptic tick. Only works during a tap, so alarms stay silent on iPhone.
+function iosHaptic() {
   try {
-    const view = event.target.value; 
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    label.style.display = 'none';
+    label.appendChild(input);
+    document.head.appendChild(label);
+    label.click();
+    label.remove();
+  } catch (error) {
+    // no haptics available
+  }
+}
 
-    if (view.byteLength >= 13) {
-      const currentPressure = view.getFloat32(0, true);
-      const setExpir        = view.getFloat32(4, true);
-      const setInspir       = view.getFloat32(8, true);
-      papState = view.getUint8(12)
-
-      document.getElementById('pressureDisplay').innerText = currentPressure.toFixed(2) + " cm H2O";
-      document.getElementById('setPressureDisplay').innerText = setExpir.toFixed(2) + " cm H2O";
-      document.getElementById('setInspirPressureDisplay').innerText = setInspir.toFixed(2) + " cm H2O";
-      updatePapButtons(papState);
-    } else {
-      document.getElementById('pressureDisplay').innerText = `Invalid size (${view.byteLength} bytes, expected 13)`;
+// Keep the screen from dimming/locking while connected
+async function keepScreenOn(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
     }
   } catch (error) {
-    document.getElementById('pressureDisplay').innerText = `Error: ${error.message}`;
+    console.warn('Wake lock:', error);
+  }
+}
+// The browser drops the wake lock when the app is hidden; take it again on return
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && (live || reconnecting)) keepScreenOn(true);
+});
+
+// Short, readable versions of the common Web Bluetooth errors
+function friendlyError(error) {
+  if (!navigator.bluetooth) return 'this browser has no Bluetooth';
+  switch (error && error.name) {
+    case 'NotFoundError':    return 'no device chosen';
+    case 'NetworkError':     return 'connection lost';
+    case 'SecurityError':    return 'Bluetooth blocked (needs https)';
+    case 'NotSupportedError':return 'not supported here';
+    default:                 return (error && error.message) || 'unknown';
   }
 }
 
-async function sendCommand(target, action) { 
-  console.log("click")
-    if (!writeCharacteristic) return;
-    
-    try {
-      const data = new Uint8Array([target]);
-        await writeCharacteristic.writeValue(data);
-        console.log(`Sent command: target=${target}, action=${action}`);
-    } catch (error) {
-        console.error("Failed to send command:", error);
-    }
+// Status text: short so it fits on a phone; the full text is in the tooltip
+function setStatus(text) {
+  const el = $('connect_status');
+  el.innerText = text;
+  el.title = text;
 }
+$('ipapUp').addEventListener('click', () => adjust('IPAP', +STEP_CM_H2O));
+$('ipapDown').addEventListener('click', () => adjust('IPAP', -STEP_CM_H2O));
+$('epapUp').addEventListener('click', () => adjust('EPAP', +STEP_CM_H2O));
+$('epapDown').addEventListener('click', () => adjust('EPAP', -STEP_CM_H2O));
+document.querySelectorAll('.mode_btn').forEach((btn) =>
+  btn.addEventListener('click', () => {
+    buzz(TAP);
+    // Update the screen straight away; the next telemetry confirms it
+    device.mode = MODE_NAMES.indexOf(btn.dataset.mode);
+    render();
+    sendText(`MODE=${btn.dataset.mode}`);
+  })
+);
 
-async function sendCommandOld(action) {
-  console.log("click")
-    if (!writeCharacteristic) return;
-    
-    try {
-        // send 1 for increase, 0 for decrease
-        const value = (action === 'increase') ? 1 : 0;
-       
-        const data = new Uint8Array([value]);
-        
-        await writeCharacteristic.writeValue(data);
-        console.log(`Sent command: ${action} (${value})`);
-    } catch (error) {
-        console.error("Failed to send command:", error);
-    }
-}
-
-async function changePAPState(toWhat) {
-  if (papState == (toWhat - 1)) {
-    sendCommand(2, 1);
-  } else if (papState == (toWhat + 1)) {
-    sendCommand(2, 0);
-  } else if ((papState == 0) && (toWhat == 2)) {
-    sendCommand(2, 0);
-  } else if ((papState == 2) && (toWhat == 0)) {
-    sendCommand(2, 1);
+// ------------------------------------------------------------
+// Sending
+// ------------------------------------------------------------
+async function sendText(text) {
+  if (!writeCharacteristic) return;
+  try {
+    await writeCharacteristic.writeValue(new TextEncoder().encode(text));
+    console.log(`Sent: ${text}`);
+  } catch (error) {
+    console.error("Failed to send command:", error);
   }
 }
 
+function adjust(which, delta) {
+  buzz(TAP);
+  const current = which === 'IPAP' ? device.ipap : device.epap;
+  if (current === null) return; // wait for first telemetry
+  const next = Math.min(MAX_CM_H2O, Math.max(MIN_CM_H2O, current + delta));
+  // Update the screen straight away; the next telemetry confirms it
+  if (which === 'IPAP') device.ipap = next; else device.epap = next;
+  render();
+  sendText(`${which}=${next.toFixed(1)}`);
+}
+
+// ------------------------------------------------------------
+// Receiving
+// ------------------------------------------------------------
+function handlePressureData(event) {
+  const v = event.target.value; // DataView
+  try {
+    if (v.byteLength < 8) {
+      $('pressureDisplay').innerText = "Invalid size";
+      return;
+    }
+    const pressure = v.getFloat32(0, true);
+    const setpoint = v.getFloat32(4, true);
+    // Number and unit are separate so the unit can be smaller and the reading fits on phones
+    const unit = document.createElement('span');
+    unit.className = 'p_unit';
+    unit.textContent = 'cm H₂O';
+    $('pressureDisplay').replaceChildren(pressure.toFixed(2), unit);
+    $('setPressureDisplay').innerText = setpoint.toFixed(2) + " cm H₂O";
+    // Phase is only known from 18-byte packets
+    Trend.add(pressure, setpoint, v.byteLength >= 18 ? (v.getUint8(17) & 0x01) !== 0 : null);
+
+    if (v.byteLength >= 18) {
+      const flow = v.getFloat32(8, true);
+      device.ipap = v.getInt16(12, true) / 100;
+      device.epap = v.getInt16(14, true) / 100;
+      device.mode = v.getUint8(16);
+      const flags = v.getUint8(17);
+
+      $('flowDisplay').innerText = flow.toFixed(1) + " L/min";
+      $('phaseDisplay').innerText = (flags & 0x01) ? "Inspiratory" : "Expiratory";
+      $('linkDisplay').innerText = (flags & 0x02) ? "OK" : "LOST";
+      render();
+      checkAlarms(pressure, setpoint, (flags & 0x02) !== 0);
+    }
+
+    if (v.byteLength >= 22 && (v.getUint8(17) & 0x04)) {
+      const blower = v.getFloat32(18, true);
+      $('blowerDisplay').innerText = blower.toFixed(2) + " cm H₂O";
+    } else {
+      $('blowerDisplay').innerText = "--";
+    }
+  } catch (error) {
+    $('pressureDisplay').innerText = `Error: ${error.message}`;
+  }
+}
+
+// Vibrate once when the valve link drops, or when the pressure has been
+// far from target for a while (not in Standby)
+function checkAlarms(pressure, setpoint, linkOk) {
+  if (linkWasOk && !linkOk) buzz(ALARM_LINK_LOST);
+  linkWasOk = linkOk;
+
+  const offTarget = MODE_NAMES[device.mode] !== 'STANDBY' &&
+    Math.abs(pressure - setpoint) > PRESSURE_ALARM_CM_H2O;
+  if (!offTarget) {
+    offTargetSince = null;
+    pressureAlarmOn = false;
+  } else if (offTargetSince === null) {
+    offTargetSince = Date.now();
+  } else if (!pressureAlarmOn && Date.now() - offTargetSince > PRESSURE_ALARM_MS) {
+    pressureAlarmOn = true;
+    buzz(ALARM_PRESSURE);
+  }
+}
+
+function resetAlarms() {
+  linkWasOk = false;
+  offTargetSince = null;
+  pressureAlarmOn = false;
+}
+
+function render() {
+  if (device.ipap !== null) $('ipapDisplay').innerText = device.ipap.toFixed(1);
+  if (device.epap !== null) $('epapDisplay').innerText = device.epap.toFixed(1);
+  document.querySelectorAll('.mode_btn').forEach((btn) =>
+    btn.classList.toggle('active', MODE_NAMES[device.mode] === btn.dataset.mode)
+  );
+
+  // CPAP uses a single pressure (sent as EPAP); BiPAP shows IPAP and EPAP separately;
+  // Standby shows no pressure controls
+  const mode = MODE_NAMES[device.mode];
+  const isCpap = mode === 'CPAP';
+  const isStandby = mode === 'STANDBY';
+  $('ipapCard').style.display = (isCpap || isStandby) ? 'none' : '';
+  $('epapCard').style.display = isStandby ? 'none' : '';
+  $('epapTitle').innerText = isCpap ? 'CPAP' : 'Expiratory (EPAP)';
+}
+
+// ------------------------------------------------------------
+// Connection
+// ------------------------------------------------------------
 async function connectBluetooth() {
-    try {
-    console.log('Requesting Bluetooth Device...');
-    document.getElementById('connect_status').innerText = "Connecting"
-    
-      // 1. Scan and filter devices
+  try {
+    setButton('busy');
+    setStatus("Connecting");
+
     connectedDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true, 
-        optionalServices: [SERVICE_UUID] 
+      // Only list the PAP device (matched by its service, or by name as a fallback)
+      filters: [{ services: [SERVICE_UUID] }, { namePrefix: "PAP" }],
+      optionalServices: [SERVICE_UUID],
     });
+    // Remove first: picking the same device again can return the same object
+    connectedDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+    connectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    setStatus("Device found");
 
-    document.getElementById('connect_status').innerText = "Device found"
-
-    // 2. Connect to the GATT Server
-    gattServer = await connectedDevice.gatt.connect();
-    document.getElementById('connect_status').innerText = "GATT connected"
-    bluetoothService = await gattServer.getPrimaryService(SERVICE_UUID);
-    document.getElementById('connect_status').innerText = "Service found"
-    pressureCharacteristic = await bluetoothService.getCharacteristic(PRESSURE_CHAR_UUID);
-    writeCharacteristic = await bluetoothService.getCharacteristic(WRITE_CHARACTERISTIC_UUID);
-    document.getElementById('connect_status').innerText = "Chararacteristic found"
-    
-    
-    await pressureCharacteristic.startNotifications();
-    pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
-    document.getElementById('connect_status').innerText = `Connected to: ${connectedDevice.name}, receiving data`;
-
+    Trend.clear(); // fresh graph for a new connection (reconnects keep the history)
+    await openGatt();
+    markConnected();
   } catch (error) {
     console.error('Bluetooth Error:', error);
-    document.getElementById('connect_status').innerText = `Error: ${error.message}`;
+    setStatus(`Error: ${friendlyError(error)}`);
+    setButton(connectedDevice && connectedDevice.gatt.connected ? 'connected' : 'idle');
   }
 }
 
-function updatePapButtons(papState) {
-  document.querySelectorAll('.pap-btn').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.pap) === papState);
-  });
+// GATT connect + characteristics + notifications (used for first connect and reconnects)
+async function openGatt() {
+  const gattServer = await connectedDevice.gatt.connect();
+  setStatus("GATT connected");
+
+  const service = await gattServer.getPrimaryService(SERVICE_UUID);
+  setStatus("Service found");
+
+  pressureCharacteristic = await service.getCharacteristic(PRESSURE_CHAR_UUID);
+  writeCharacteristic = await service.getCharacteristic(WRITE_CHARACTERISTIC_UUID);
+  setStatus("Characteristics found");
+
+  await pressureCharacteristic.startNotifications();
+  pressureCharacteristic.removeEventListener('characteristicvaluechanged', handlePressureData);
+  pressureCharacteristic.addEventListener('characteristicvaluechanged', handlePressureData);
+}
+
+function markConnected() {
+  live = true;
+  setStatus(`Connected to ${connectedDevice.name || 'device'}`);
+  setButton('connected');
+  keepScreenOn(true);
+  Trend.setLive(true);
+}
+
+function onDisconnected() {
+  const wasLive = live;
+  live = false;
+  Trend.setLive(false);
+  writeCharacteristic = null;
+  pressureCharacteristic = null;
+  device = { ipap: null, epap: null, mode: 0 };
+  render();
+  resetAlarms();
+  $('linkDisplay').innerText = "--";
+
+  if (reconnecting) return; // the reconnect loop carries on
+  if (wasLive && !userDisconnect) {
+    buzz(ALARM_DISCONNECT);
+    reconnect();
+    return;
+  }
+  userDisconnect = false;
+  setStatus("Disconnected");
+  setButton('idle');
+  keepScreenOn(false);
+}
+
+// Unexpected drop: try the same device again a few times, waiting a bit longer each time
+async function reconnect() {
+  reconnecting = true;
+  setButton('reconnecting');
+  for (let attempt = 1; attempt <= RECONNECT_ATTEMPTS; attempt++) {
+    setStatus(`Reconnecting (${attempt}/${RECONNECT_ATTEMPTS})`);
+    try {
+      await openGatt();
+      if (!reconnecting) { // cancelled while connecting
+        connectedDevice.gatt.disconnect();
+        return;
+      }
+      reconnecting = false;
+      markConnected();
+      return;
+    } catch (error) {
+      console.warn(`Reconnect ${attempt} failed:`, error);
+    }
+    if (!reconnecting) return;
+    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    if (!reconnecting) return;
+  }
+  reconnecting = false;
+  setStatus("Error: reconnect failed");
+  setButton('idle');
+  keepScreenOn(false);
+}
+
+function cancelReconnect() {
+  reconnecting = false;
+  if (connectedDevice) connectedDevice.gatt.disconnect(); // also stops a connect in progress
+  setStatus("Disconnected");
+  setButton('idle');
+  keepScreenOn(false);
+}
+
+// Offline support (see sw.js)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((error) => console.warn('Service worker:', error));
 }

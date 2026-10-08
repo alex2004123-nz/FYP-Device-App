@@ -14,7 +14,7 @@
     body.classList.toggle('is-connected', status.startsWith('Connected to'));
     body.classList.toggle('is-error', status.startsWith('Error') || status.startsWith('Disconnected'));
     body.classList.toggle('is-busy', !status.startsWith('Connected to') &&
-      (status.startsWith('Reconnecting') ||
+      (status.startsWith('Reconnecting') || status.startsWith('Looking for') ||
       ['Connecting', 'Device found', 'GATT connected', 'Service found', 'Characteristics found'].includes(status)));
     body.classList.toggle('phase-insp', phase === 'Inspiratory');
     body.classList.toggle('phase-exp', phase === 'Expiratory');

@@ -51,6 +51,7 @@ const $ = (id) => document.getElementById(id);
 
 $('bluetoothConnect').addEventListener('click', onConnectButton);
 render();
+startupConnect();
 
 // Connect when disconnected, disconnect when connected, cancel while reconnecting
 function onConnectButton() {
@@ -267,7 +268,9 @@ function render() {
 // ------------------------------------------------------------
 // Connection
 // ------------------------------------------------------------
-async function connectBluetooth() {
+// fromStartup: opened without a tap, so a "needs a tap" refusal is expected and kept quiet
+async function connectBluetooth({ fromStartup = false } = {}) {
+  stopWaitingForTap();
   try {
     setButton('busy');
     setStatus("Connecting");
@@ -286,10 +289,17 @@ async function connectBluetooth() {
     await openGatt();
     markConnected();
   } catch (error) {
+    setButton(connectedDevice && connectedDevice.gatt.connected ? 'connected' : 'idle');
+    if (fromStartup && (error.name === 'SecurityError' || error.name === 'NotFoundError')) {
+      // Refused without a tap (Chrome), or the list was closed: just stay ready
+      setStatus("Not connected yet...");
+      return error;
+    }
     console.error('Bluetooth Error:', error);
     setStatus(`Error: ${friendlyError(error)}`);
-    setButton(connectedDevice && connectedDevice.gatt.connected ? 'connected' : 'idle');
+    return error;
   }
+  return null;
 }
 
 // GATT connect + characteristics + notifications (used for first connect and reconnects)
@@ -340,32 +350,90 @@ function onDisconnected() {
   keepScreenOn(false);
 }
 
-// Unexpected drop: try the same device again a few times, waiting a bit longer each time
-async function reconnect() {
+// Unexpected drop: try the same device again a few times, waiting a bit longer each time.
+// Also used by autoConnect() on start-up, with its own wording.
+async function reconnect(label = 'Reconnecting', failText = 'Error: reconnect failed') {
   reconnecting = true;
   setButton('reconnecting');
   for (let attempt = 1; attempt <= RECONNECT_ATTEMPTS; attempt++) {
-    setStatus(`Reconnecting (${attempt}/${RECONNECT_ATTEMPTS})`);
+    setStatus(`${label} (${attempt}/${RECONNECT_ATTEMPTS})`);
     try {
       await openGatt();
       if (!reconnecting) { // cancelled while connecting
         connectedDevice.gatt.disconnect();
-        return;
+        return null;
       }
       reconnecting = false;
       markConnected();
-      return;
+      return true;
     } catch (error) {
       console.warn(`Reconnect ${attempt} failed:`, error);
     }
-    if (!reconnecting) return;
+    if (!reconnecting) return null;
     await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
-    if (!reconnecting) return;
+    if (!reconnecting) return null;
   }
   reconnecting = false;
-  setStatus("Error: reconnect failed");
+  setStatus(failText);
   setButton('idle');
   keepScreenOn(false);
+  return false;
+}
+
+// On start-up, connect straight to a PAP device this site was allowed to use before.
+// Needs getDevices(), which only some browsers have (Chrome currently behind a flag);
+// anywhere else nothing happens and the Connect button works as usual.
+// Returns true connected, false not possible / gave up, null cancelled by the user
+async function autoConnect() {
+  if (!navigator.bluetooth.getDevices) return false;
+  let devices = [];
+  try {
+    devices = await navigator.bluetooth.getDevices();
+  } catch (error) {
+    console.warn('getDevices:', error);
+    return false;
+  }
+  const known = devices.find((d) => (d.name || '').startsWith('PAP')) || devices[0];
+  if (!known) return false;
+  connectedDevice = known;
+  connectedDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+  connectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
+  return reconnect(`Looking for ${known.name || 'PAP device'}`, 'Not connected yet...');
+}
+
+// On opening the app:
+//  1. reconnect to a remembered device if the browser allows it (autoConnect)
+//  2. otherwise open the device list straight away; some browsers allow this without a tap
+//  3. if the browser insists on a tap (Chrome), the first tap anywhere opens the list
+async function startupConnect() {
+  if (!navigator.bluetooth) return; // no Bluetooth in this browser: leave the page as it is
+  const auto = await autoConnect();
+  if (auto !== false || userActed()) return; // connected, cancelled, or the user already tapped Connect
+  const error = await connectBluetooth({ fromStartup: true });
+  if (error && error.name === 'SecurityError' && !userActed()) waitForTap();
+}
+
+// The user has started connecting or is connected, so start-up should stay out of the way
+function userActed() {
+  return live || reconnecting || $('bluetoothConnect').disabled;
+}
+
+// Any tap on the page opens the device list (header switches and the connect button keep their own jobs)
+function onAnyTap(event) {
+  if (event.target.closest('.topbar, #bluetoothConnect')) return;
+  if (userActed()) { stopWaitingForTap(); return; }
+  // This tap only opens the list, so it doesn't also press whatever was under it (e.g. a mode button)
+  event.preventDefault();
+  event.stopPropagation();
+  buzz(TAP);
+  connectBluetooth();
+}
+function waitForTap() {
+  setStatus("Tap anywhere to connect");
+  document.addEventListener('click', onAnyTap, true);
+}
+function stopWaitingForTap() {
+  document.removeEventListener('click', onAnyTap, true);
 }
 
 function cancelReconnect() {

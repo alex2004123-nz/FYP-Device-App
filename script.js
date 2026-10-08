@@ -351,12 +351,13 @@ function onDisconnected() {
 }
 
 // Unexpected drop: try the same device again a few times, waiting a bit longer each time.
-// Also used by autoConnect() on start-up, with its own wording.
-async function reconnect(label = 'Reconnecting', failText = 'Error: reconnect failed') {
+// Also used by autoConnect() on start-up, with its own wording and quicker retries.
+// gapMs: fixed wait between tries (null = 1 s, 2 s, 3 s... after drops); showCount adds "(n/5)".
+async function reconnect({ label = 'Reconnecting', failText = 'Error: reconnect failed', gapMs = null, showCount = true } = {}) {
   reconnecting = true;
   setButton('reconnecting');
   for (let attempt = 1; attempt <= RECONNECT_ATTEMPTS; attempt++) {
-    setStatus(`${label} (${attempt}/${RECONNECT_ATTEMPTS})`);
+    setStatus(showCount ? `${label} (${attempt}/${RECONNECT_ATTEMPTS})` : label);
     try {
       await openGatt();
       if (!reconnecting) { // cancelled while connecting
@@ -370,7 +371,7 @@ async function reconnect(label = 'Reconnecting', failText = 'Error: reconnect fa
       console.warn(`Reconnect ${attempt} failed:`, error);
     }
     if (!reconnecting) return null;
-    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    await new Promise((resolve) => setTimeout(resolve, gapMs ?? attempt * 1000));
     if (!reconnecting) return null;
   }
   reconnecting = false;
@@ -398,7 +399,8 @@ async function autoConnect() {
   connectedDevice = known;
   connectedDevice.removeEventListener('gattserverdisconnected', onDisconnected);
   connectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
-  return reconnect(`Looking for ${known.name || 'PAP device'}`, 'Not connected yet...');
+  // 5 quick tries over about a second
+  return reconnect({ label: 'Looking for PAP device', failText: 'Not connected yet...', gapMs: 250, showCount: false });
 }
 
 // On opening the app:

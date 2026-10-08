@@ -268,8 +268,7 @@ function render() {
 // ------------------------------------------------------------
 // Connection
 // ------------------------------------------------------------
-// fromStartup: opened without a tap, so a "needs a tap" refusal is expected and kept quiet
-async function connectBluetooth({ fromStartup = false } = {}) {
+async function connectBluetooth() {
   stopWaitingForTap();
   try {
     setButton('busy');
@@ -289,17 +288,10 @@ async function connectBluetooth({ fromStartup = false } = {}) {
     await openGatt();
     markConnected();
   } catch (error) {
-    setButton(connectedDevice && connectedDevice.gatt.connected ? 'connected' : 'idle');
-    if (fromStartup && (error.name === 'SecurityError' || error.name === 'NotFoundError')) {
-      // Refused without a tap (Chrome), or the list was closed: just stay ready
-      setStatus("Not connected yet...");
-      return error;
-    }
     console.error('Bluetooth Error:', error);
     setStatus(`Error: ${friendlyError(error)}`);
-    return error;
+    setButton(connectedDevice && connectedDevice.gatt.connected ? 'connected' : 'idle');
   }
-  return null;
 }
 
 // GATT connect + characteristics + notifications (used for first connect and reconnects)
@@ -405,14 +397,12 @@ async function autoConnect() {
 
 // On opening the app:
 //  1. reconnect to a remembered device if the browser allows it (autoConnect)
-//  2. otherwise open the device list straight away; some browsers allow this without a tap
-//  3. if the browser insists on a tap (Chrome), the first tap anywhere opens the list
+//  2. otherwise the first tap anywhere opens the device list
 async function startupConnect() {
   if (!navigator.bluetooth) return; // no Bluetooth in this browser: leave the page as it is
   const auto = await autoConnect();
   if (auto !== false || userActed()) return; // connected, cancelled, or the user already tapped Connect
-  const error = await connectBluetooth({ fromStartup: true });
-  if (error && error.name === 'SecurityError' && !userActed()) waitForTap();
+  waitForTap();
 }
 
 // The user has started connecting or is connected, so start-up should stay out of the way
